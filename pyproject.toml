@@ -1,0 +1,27 @@
+[project]
+name = "trader"
+version = "0.1.0"
+description = "Paper-money research system for US stocks and crypto"
+requires-python = ">=3.12"
+dependencies = [
+    "alpaca-py>=0.30",
+    "ccxt>=4.3",
+    "duckdb>=1.0",
+    "pandas>=2.2",
+    "pyarrow>=16",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

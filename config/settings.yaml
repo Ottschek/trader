@@ -1,0 +1,64 @@
+# Main settings. Secrets (API keys) do NOT go here — they live in .env.
+
+timeframe: 1h
+history_start: "2016-01-01"
+
+universe:
+  # Note: a hand-picked list of today's names is survivorship-biased.
+  # Fine for building infrastructure; single-stock strategies must account for it in M3.
+  stocks:
+    # broad market / macro ETFs
+    - SPY
+    - QQQ
+    - IWM
+    - DIA
+    - TLT
+    - GLD
+    # large caps
+    - AAPL
+    - MSFT
+    - NVDA
+    - AMZN
+    - GOOGL
+    - META
+    - TSLA
+    - JPM
+    - XOM
+    # crypto-linked (for cross-asset ideas)
+    - COIN
+    - MSTR
+    - MARA
+    - RIOT
+    - IBIT
+  crypto:
+    - BTC/USD
+    - ETH/USD
+    - SOL/USD
+    - LTC/USD
+    - DOGE/USD
+    - AVAX/USD
+    - LINK/USD
+    - UNI/USD
+    - AAVE/USD
+    - BCH/USD
+
+benchmarks:
+  stocks: SPY
+  crypto: BTC/USD
+
+# Enforced by the risk manager (M5). Fractions of account equity.
+risk:
+  max_position_pct: 0.10
+  max_daily_loss_pct: 0.03
+  kill_switch_drawdown_pct: 0.15
+
+# Trading costs per venue, in basis points (1 bp = 0.01%). Applied on every trade.
+costs:
+  alpaca_stocks:
+    commission_bps: 0
+    spread_bps: 2
+    slippage_bps: 3
+  alpaca_crypto:
+    commission_bps: 25   # Alpaca crypto taker fee, lowest volume tier
+    spread_bps: 5
+    slippage_bps: 5
