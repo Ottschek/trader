@@ -1,0 +1,145 @@
+"""Hourly collector. The same command does the first backfill and every update after:
+each source resumes from its last stored bar (or from settings.history_start).
+
+Run:  .venv/bin/python scripts/collect.py
+      .venv/bin/python scripts/collect.py --sources coinbase,hyperliquid --symbols BTC/USD
+Exit code 1 if any quality check fails.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+
+import pandas as pd
+
+from trader.config import ConfigError, load_alpaca_secrets, load_settings
+from trader.data import alpaca_data, coinbase, hyperliquid
+from trader.data import quality as q
+from trader.data.store import bars_path, data_dir, funding_path, read, snapshots_path
+
+ALL_SOURCES = ["coinbase", "alpaca_crypto", "hyperliquid", "alpaca_stocks"]
+
+
+def coin_of(symbol: str) -> str:
+    return symbol.split("/")[0]
+
+
+def download(sources, crypto, stocks, settings, now) -> list[q.CheckResult]:
+    """Run every downloader; a failure in one symbol is recorded and the rest carry on."""
+    results: list[q.CheckResult] = []
+
+    def run(dataset: str, fn, *args):
+        t0 = time.time()
+        try:
+            n = fn(*args)
+            print(f"  {dataset}: +{n} rows ({time.time() - t0:.0f}s)")
+        except Exception as e:
+            print(f"  {dataset}: ERROR {type(e).__name__}: {e}")
+            results.append(q.CheckResult("download", dataset, q.FAIL, f"{type(e).__name__}: {e}"[:300]))
+
+    if "coinbase" in sources:
+        print("Coinbase spot (hourly)")
+        ex = coinbase.make_exchange()
+        for s in crypto:
+            run(f"coinbase {s}", coinbase.update, s, settings.history_start, now, ex)
+
+    if "alpaca_crypto" in sources:
+        print("Alpaca crypto (hourly)")
+        for s in crypto:
+            run(f"alpaca_crypto {s}", alpaca_data.update_crypto, s, settings.history_start, now)
+
+    if "hyperliquid" in sources:
+        print("Hyperliquid funding + open interest")
+        for s in crypto:
+            run(f"funding {coin_of(s)}", hyperliquid.update_funding, coin_of(s))
+        run("hyperliquid snapshot", hyperliquid.snapshot, [coin_of(s) for s in crypto], now)
+
+    if "alpaca_stocks" in sources:
+        print("Alpaca stocks (30m -> session hourly) + corporate actions")
+        try:
+            secrets = load_alpaca_secrets()
+        except ConfigError as e:
+            print(f"  skipped: {e}")
+            results.append(q.CheckResult("download", "alpaca_stocks", q.WARN, "skipped: no Alpaca paper keys yet"))
+        else:
+            for s in stocks:
+                run(f"alpaca_stocks {s}", alpaca_data.update_stock, s, settings.history_start, now, secrets)
+            run("corporate actions", alpaca_data.update_corporate_actions, list(stocks), settings.history_start, secrets)
+    return results
+
+
+def run_checks(sources, crypto, stocks, now) -> list[q.CheckResult]:
+    results: list[q.CheckResult] = []
+
+    def bar_checks(source: str, symbol: str, max_age_h: float, spike: float, gaps: bool):
+        name = f"{source} {symbol}"
+        df = read(bars_path(source, symbol))
+        if df.empty:
+            results.append(q.CheckResult("staleness", name, q.FAIL, "no data"))
+            return df
+        results.extend([q.check_ohlc(df, name), q.check_duplicates(df, name),
+                        q.check_spikes(df, name, spike), q.check_staleness(df, name, now, max_age_h)])
+        if gaps:
+            results.append(q.check_gaps(df, name))
+        return df
+
+    for s in crypto:
+        cb = bar_checks("coinbase", s, 3, 0.25, True) if "coinbase" in sources else pd.DataFrame()
+        al = bar_checks("alpaca_crypto", s, 3, 0.25, True) if "alpaca_crypto" in sources else pd.DataFrame()
+        if not cb.empty and not al.empty:
+            results.append(q.check_drift(al, cb, f"alpaca vs coinbase {s}"))
+
+    if "hyperliquid" in sources:
+        for s in crypto:
+            df = read(funding_path(coin_of(s)))
+            name = f"funding {coin_of(s)}"
+            results.extend([q.check_duplicates(df, name), q.check_staleness(df, name, now, 3)] if not df.empty
+                           else [q.CheckResult("staleness", name, q.FAIL, "no data")])
+        snap = read(snapshots_path())
+        results.append(q.check_staleness(snap, "hyperliquid snapshot", now, 2))
+
+    if "alpaca_stocks" in sources and any(bars_path("alpaca_stocks", s).exists() for s in stocks):
+        for s in stocks:
+            # stocks don't trade on weekends/holidays: allow up to 4 days without a bar
+            bar_checks("alpaca_stocks", s, 96, 0.15, False)
+    return results
+
+
+def main() -> int:
+    p = argparse.ArgumentParser()
+    p.add_argument("--sources", default=",".join(ALL_SOURCES))
+    p.add_argument("--symbols", help="comma-separated subset, e.g. BTC/USD,SPY")
+    args = p.parse_args()
+
+    settings = load_settings()
+    sources = args.sources.split(",")
+    crypto, stocks = list(settings.crypto), list(settings.stocks)
+    if args.symbols:
+        wanted = set(args.symbols.split(","))
+        crypto = [s for s in crypto if s in wanted]
+        stocks = [s for s in stocks if s in wanted]
+
+    now = pd.Timestamp.now(tz="UTC")
+    print(f"Collector run {now:%Y-%m-%d %H:%M} UTC -> {data_dir()}")
+    results = download(sources, crypto, stocks, settings, now)
+    results += run_checks(sources, crypto, stocks, now)
+
+    out = data_dir() / "checks" / "latest.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({"run_at": now.isoformat(), "status": q.worst(results),
+                               "results": [r.to_dict() for r in results]}, indent=1))
+
+    print("\nChecks:")
+    for r in results:
+        if r.status != q.OK:
+            print(f"  {r.status.upper():4} {r.check:10} {r.dataset}: {r.detail}")
+    counts = {s: sum(r.status == s for r in results) for s in (q.OK, q.WARN, q.FAIL)}
+    print(f"  {counts[q.OK]} ok, {counts[q.WARN]} warn, {counts[q.FAIL]} fail -> overall {q.worst(results).upper()}")
+    return 1 if q.worst(results) == q.FAIL else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
