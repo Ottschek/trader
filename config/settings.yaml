@@ -62,3 +62,10 @@ costs:
     commission_bps: 25   # Alpaca crypto taker fee, lowest volume tier
     spread_bps: 5
     slippage_bps: 5
+
+# Cloud: where the hourly GitHub Actions run keeps its data and reports.
+cloud:
+  r2_bucket: trader-data
+  d1_database_id: a4287e14-2892-4a4f-9953-a6bab17c2716
+  timezone: Europe/Vienna
+  summary_times: ["08:00", "22:30"]   # daily Telegram status, local time

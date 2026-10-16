@@ -3,13 +3,19 @@ each source resumes from its last stored bar (or from settings.history_start).
 
 Run:  .venv/bin/python scripts/collect.py
       .venv/bin/python scripts/collect.py --sources coinbase,hyperliquid --symbols BTC/USD
-Exit code 1 if any quality check fails.
+      .venv/bin/python scripts/collect.py --cloud    # what GitHub Actions runs every hour
+
+Locally: exit code 1 if any quality check fails.
+With --cloud: pulls data from R2 first, then records the run in D1, pushes changed files
+back to R2 and sends a Telegram alert when the set of failing checks changes. Failing
+checks are reported via Telegram, so the exit code is only non-zero if the run itself breaks.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 
@@ -27,14 +33,18 @@ def coin_of(symbol: str) -> str:
     return symbol.split("/")[0]
 
 
-def download(sources, crypto, stocks, settings, now) -> list[q.CheckResult]:
-    """Run every downloader; a failure in one symbol is recorded and the rest carry on."""
+def download(sources, crypto, stocks, settings, now) -> tuple[list[q.CheckResult], int]:
+    """Run every downloader; a failure in one symbol is recorded and the rest carry on.
+    Returns the failures and the total number of rows added."""
     results: list[q.CheckResult] = []
+    added = 0
 
     def run(dataset: str, fn, *args):
+        nonlocal added
         t0 = time.time()
         try:
             n = fn(*args)
+            added += n
             print(f"  {dataset}: +{n} rows ({time.time() - t0:.0f}s)")
         except Exception as e:
             print(f"  {dataset}: ERROR {type(e).__name__}: {e}")
@@ -68,7 +78,7 @@ def download(sources, crypto, stocks, settings, now) -> list[q.CheckResult]:
             for s in stocks:
                 run(f"alpaca_stocks {s}", alpaca_data.update_stock, s, settings.history_start, now, secrets)
             run("corporate actions", alpaca_data.update_corporate_actions, list(stocks), settings.history_start, secrets)
-    return results
+    return results, added
 
 
 def run_checks(sources, crypto, stocks, now) -> list[q.CheckResult]:
@@ -112,6 +122,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--sources", default=",".join(ALL_SOURCES))
     p.add_argument("--symbols", help="comma-separated subset, e.g. BTC/USD,SPY")
+    p.add_argument("--cloud", action="store_true", help="sync with R2, record in D1, alert via Telegram")
     args = p.parse_args()
 
     settings = load_settings()
@@ -123,14 +134,25 @@ def main() -> int:
         stocks = [s for s in stocks if s in wanted]
 
     now = pd.Timestamp.now(tz="UTC")
+    t0 = time.time()
     print(f"Collector run {now:%Y-%m-%d %H:%M} UTC -> {data_dir()}")
-    results = download(sources, crypto, stocks, settings, now)
+    out = data_dir() / "checks" / "latest.json"
+
+    if args.cloud:
+        from trader.data import r2
+        print(f"Pulling data from R2 bucket {settings.cloud.r2_bucket}")
+        print(f"  {r2.pull(settings.cloud.r2_bucket)} files downloaded")
+    previous = json.loads(out.read_text())["results"] if out.exists() else None
+
+    results, added = download(sources, crypto, stocks, settings, now)
     results += run_checks(sources, crypto, stocks, now)
 
-    out = data_dir() / "checks" / "latest.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"run_at": now.isoformat(), "status": q.worst(results),
                                "results": [r.to_dict() for r in results]}, indent=1))
+
+    if args.cloud:
+        report_to_cloud(settings, now, results, previous, added, time.time() - t0)
 
     print("\nChecks:")
     for r in results:
@@ -138,7 +160,24 @@ def main() -> int:
             print(f"  {r.status.upper():4} {r.check:10} {r.dataset}: {r.detail}")
     counts = {s: sum(r.status == s for r in results) for s in (q.OK, q.WARN, q.FAIL)}
     print(f"  {counts[q.OK]} ok, {counts[q.WARN]} warn, {counts[q.FAIL]} fail -> overall {q.worst(results).upper()}")
+    if args.cloud:
+        return 0  # failing checks were reported via Telegram; only a crash should fail the job
     return 1 if q.worst(results) == q.FAIL else 0
+
+
+def report_to_cloud(settings, now, results, previous, added, duration_s) -> None:
+    from trader.data import r2
+    from trader.monitor import report, telegram
+    from trader.monitor.d1 import D1
+
+    trigger = {"schedule": "schedule", "workflow_dispatch": "manual"}.get(os.environ.get("GITHUB_EVENT_NAME", ""), "local")
+    print("Recording run in D1")
+    report.record_run(D1(settings.cloud.d1_database_id), now, results, added, duration_s, trigger)
+    print(f"Pushing changed files to R2: {r2.push(settings.cloud.r2_bucket)} uploaded")
+    alert = report.failure_alert(results, previous)
+    if alert:
+        telegram.send(alert)
+        print("Telegram alert sent")
 
 
 if __name__ == "__main__":

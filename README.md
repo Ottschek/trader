@@ -31,6 +31,17 @@ cp .env.example .env   # then put your Alpaca PAPER keys in .env
 
 Stored as Parquet under `data/` (git-ignored), queryable with DuckDB via `trader.data.store.connect()`.
 
+## Cloud (hourly run)
+
+GitHub Actions runs `scripts/collect.py --cloud` every hour at :07 UTC: pull data from the private R2 bucket
+`trader-data` → collect → quality checks → record in D1 → push changed files → Telegram alert if failures change.
+`summary.yml` sends a Telegram status at 08:00 and 22:30 Vienna time.
+
+Setup: fill in `.env` (see `.env.example`), check it with `.venv/bin/python scripts/check_setup.py`,
+then upload the same values to GitHub with `gh secret set -f .env`.
+
+Note: GitHub pauses scheduled workflows in public repos after 60 days without commits.
+
 ## Safety
 
 - Only Alpaca **paper** keys (starting with `PK`) are accepted; the client is hard-coded to the paper endpoint.

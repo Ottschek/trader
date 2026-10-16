@@ -37,6 +37,14 @@ class VenueCosts:
 
 
 @dataclass(frozen=True)
+class CloudSettings:
+    r2_bucket: str
+    d1_database_id: str
+    timezone: str
+    summary_times: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Settings:
     timeframe: str
     history_start: str
@@ -45,6 +53,7 @@ class Settings:
     benchmarks: dict[str, str]
     risk: RiskLimits
     costs: dict[str, VenueCosts]
+    cloud: CloudSettings | None = None
 
 
 @dataclass(frozen=True)
@@ -72,7 +81,19 @@ def load_settings(path: Path = DEFAULT_SETTINGS_PATH) -> Settings:
         benchmarks=dict(raw["benchmarks"]),
         risk=risk,
         costs={venue: VenueCosts(**c) for venue, c in raw["costs"].items()},
+        cloud=CloudSettings(**{**raw["cloud"], "summary_times": tuple(raw["cloud"]["summary_times"])})
+        if "cloud" in raw else None,
     )
+
+
+def secret(name: str, env_file: Path | None = PROJECT_ROOT / ".env") -> str:
+    """Read one secret from the environment (or .env). Raises a clear error if it's missing."""
+    if env_file is not None:
+        load_dotenv(env_file)
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise ConfigError(f"{name} is not set. Add it to .env (locally) or GitHub Secrets (for Actions).")
+    return value
 
 
 def load_alpaca_secrets(env_file: Path | None = PROJECT_ROOT / ".env") -> AlpacaSecrets:
