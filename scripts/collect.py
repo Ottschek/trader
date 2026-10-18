@@ -179,6 +179,19 @@ def merge_worker_snapshots(settings) -> None:
     print(f"  {hyperliquid.merge_worker_snapshots(rows)} open interest snapshots merged from the Worker")
 
 
+def sync_ledger_to_d1(settings) -> None:
+    """Copy committed ledger entries that D1 doesn't have yet (for the Strategy lab page)."""
+    from trader.data import r2
+    from trader.ledger import sync
+    from trader.monitor.d1 import D1
+
+    keys = r2.remote_index(r2.client(), settings.cloud.r2_bucket)
+    reported = {k[len(sync.REPORT_PREFIX):-len(".html")] for k in keys if k.startswith(sync.REPORT_PREFIX)}
+    n = sync.sync_ledger(D1(settings.cloud.d1_database_id), reported=reported)
+    if n:
+        print(f"Ledger: {n} new experiments synced to D1")
+
+
 def report_to_cloud(settings, now, results, previous, added, duration_s) -> None:
     from trader.data import r2
     from trader.monitor import report, telegram
@@ -188,6 +201,7 @@ def report_to_cloud(settings, now, results, previous, added, duration_s) -> None
     print("Recording run in D1")
     report.record_run(D1(settings.cloud.d1_database_id), now, results, added, duration_s, trigger)
     print(f"Pushing changed files to R2: {r2.push(settings.cloud.r2_bucket)} uploaded")
+    sync_ledger_to_d1(settings)
     alert = report.failure_alert(results, previous)
     if alert:
         telegram.send(alert)

@@ -99,8 +99,8 @@ A public, read-only dashboard at https://trader-web-6t6.pages.dev, grown milesto
   - **Kill switch acts instantly**: cancels open orders and closes positions via Alpaca. Telegram `/stop` does the same.
   - Start backtests and jobs on demand by triggering GitHub Actions workflows.
 - **Views, added as milestones land:**
-  - M1: **Data health** — collector runs, gaps, failed checks, Alpaca vs Coinbase drift.
-  - M3: **Strategy lab** — report cards, experiment ledger, idea funnel and graveyard.
+  - M1: **Data health** ✅ — collector runs, gaps, failed checks, Alpaca vs Coinbase drift.
+  - M3: **Strategy lab** ✅ (`#/lab`) — report cards, experiment ledger, idea funnel and graveyard.
   - M5: **Overview** (equity curve vs buy-and-hold, P&L, drawdown) and **Positions + trade log** with the reason for each trade.
   - M5: **Control panel** and kill switch.
 

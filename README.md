@@ -41,8 +41,10 @@ Stored as Parquet under `data/` (git-ignored), queryable with DuckDB via `trader
 - **Cloudflare Worker** (`cloudflare/scheduler`) does the time-critical jobs on Cloudflare's clock: records
   Hyperliquid open interest every hour into D1, sends the Telegram summary at 08:00 and 22:30 Vienna time, and
   alerts if the collector hasn't run for 6 hours. Deploy with `npx wrangler deploy` in that folder.
-- **Web app** (`web/`): public, read-only data health page at https://trader-web-6t6.pages.dev.
-  Deploy with `npm run deploy` in `web/`.
+- **Web app** (`web/`): public, read-only, at https://trader-web-6t6.pages.dev. **Data health** (collector runs,
+  checks, stored data) and **Strategy lab** (`#/lab`: the experiment ledger, report cards, the graveyard).
+  `scripts/validate.py` publishes each run there; `scripts/sync_ledger.py` resyncs everything; the collector also
+  copies any committed ledger entries D1 is missing. Deploy with `npm run deploy` in `web/`.
 
 Setup: fill in `.env` (see `.env.example`), check it with `.venv/bin/python scripts/check_setup.py`,
 then upload the same values to GitHub with `gh secret set -f .env`.

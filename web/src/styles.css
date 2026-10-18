@@ -107,3 +107,31 @@ main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .card { padding: 16px; }
 }
 .tile .badge { white-space: normal; }
+
+/* navigation tabs */
+.tabs { display: flex; gap: 4px; background: var(--none); padding: 3px; border-radius: 10px; }
+.tab { padding: 6px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 550; color: var(--text-2); text-decoration: none; }
+.tab:hover { color: var(--text); }
+.tab-on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.tab:focus-visible, .chip:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* strategy lab */
+.funnel { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.funnel-label { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 4px; }
+.funnel-track { height: 10px; background: var(--none); border-radius: 999px; overflow: hidden; }
+.funnel-bar { height: 100%; min-width: 0; background: #2a78d6; border-radius: 999px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font: inherit; font-size: 12.5px;
+  font-weight: 550; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.chip-on { background: var(--text); border-color: var(--text); color: #fff; }
+.gates { display: inline-flex; gap: 3px; }
+.gate { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10px;
+  font-weight: 800; color: #fff; cursor: default; }
+.gate-ok { background: var(--good); }
+.gate-fail { background: var(--critical); }
+.idea-name { font-weight: 550; }
+.killed { margin-top: 4px; white-space: normal; max-width: 220px; }
+.ledger td { vertical-align: top; }
+.ledger a { color: #2a78d6; font-weight: 550; text-decoration: none; }
+.ledger a:hover { text-decoration: underline; }
+.card > .small:last-child { margin: 12px 0 0; }

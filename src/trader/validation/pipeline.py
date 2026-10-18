@@ -41,6 +41,10 @@ class Gate:
     value: str
     threshold: str
 
+    def __post_init__(self):
+        # comparisons on numpy numbers give numpy bools, which JSON would store as "True"/"False"
+        self.passed = bool(self.passed)
+
 
 @dataclass
 class ReportCard:

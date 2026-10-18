@@ -59,8 +59,28 @@ def main() -> int:
         print(f"  holdout: Sharpe {h['metrics']['sharpe']:.2f} vs hold {h['benchmark']['sharpe']:.2f}, "
               f"max drawdown {h['metrics']['max_drawdown']:.1%} -> {'PASSED' if h['passed'] else 'FAILED'}")
     print(f"\nTrials this run: {card.trials} · total in ledger: {card.total_trials}")
-    print(f"Report card: {report_html.write(card)}")
+    path = report_html.write(card)
+    print(f"Report card: {path}")
+    if not args.no_record:
+        publish(card, path)
+    print("Commit ledger/experiments.jsonl to keep the record.")
     return 0
+
+
+def publish(card, path) -> None:
+    """Upload the report card to R2 and the ledger entry to D1 for the web app's Strategy lab.
+    Optional: if the cloud keys aren't set up, the local ledger and report still exist."""
+    try:
+        from trader.data import r2
+        from trader.ledger import sync
+        from trader.monitor.d1 import D1
+
+        cloud = load_settings().cloud
+        sync.upload_report(r2.client(), cloud.r2_bucket, card.id, path.read_text())
+        sync.sync_ledger(D1(cloud.d1_database_id), [card.ledger_entry()], reported={card.id}, only_missing=False)
+        print("Published to the Strategy lab: https://trader-web-6t6.pages.dev/#/lab")
+    except Exception as e:  # noqa: BLE001 - publishing is best-effort
+        print(f"(Not published to the web app: {type(e).__name__}: {e})")
 
 
 if __name__ == "__main__":

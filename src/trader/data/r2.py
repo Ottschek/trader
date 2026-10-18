@@ -51,10 +51,13 @@ def local_files(root: Path) -> dict[str, Path]:
 
 
 def pull(bucket: str, s3=None, root: Path | None = None) -> int:
-    """Download every object that is missing or different locally."""
+    """Download every data file that is missing or different locally (report cards and
+    other non-data objects in the bucket are skipped)."""
     s3, root = s3 or client(), root or data_dir()
     n = 0
     for key, etag in remote_index(s3, bucket).items():
+        if Path(key).suffix not in SYNCED_SUFFIXES:
+            continue
         path = root / key
         if path.exists() and _md5(path) == etag:
             continue

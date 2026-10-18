@@ -8,6 +8,11 @@ binding = "DB"
 database_name = "trader"
 database_id = "a4287e14-2892-4a4f-9953-a6bab17c2716"
 
+# Report cards (reports/<id>.html in the private data bucket), served at /reports/<id>.
+[[r2_buckets]]
+binding = "REPORTS"
+bucket_name = "trader-data"
+
 [vars]
 # Optional login. Empty = public read-only site: GET requests are answered, anything that
 # changes something is refused. Set both to require a Cloudflare Access login for changes.

@@ -113,3 +113,33 @@ def test_worker_snapshots_merge_into_parquet(tmp_path, monkeypatch):
     assert df.loc[df["coin"] == "BTC", "open_interest"].item() == 43000.0
     assert str(df["ts"].dt.tz) == "UTC"
     assert hyperliquid.merge_worker_snapshots([]) == 0
+
+
+# --- ledger sync -----------------------------------------------------------------
+
+def test_ledger_rows_and_only_missing_sync(monkeypatch):
+    from trader.ledger import sync
+    entry = {"id": "abc123def456", "created_at": "2026-10-18T11:40:00+00:00", "idea": "k", "strategy": "sma_cross",
+             "symbols": ["BTC/USD"], "benchmark": "BTC/USD", "verdict": "rejected", "trials": 8, "total_trials": 8,
+             "code": {"commit": "1070121", "dirty": False}, "research_window": ["2016-01-01", "2024-10-17"],
+             "oos": {"sharpe": 0.92, "cagr": 0.3, "max_drawdown": -0.57}, "benchmark_oos": {"sharpe": 0.68},
+             "random_entry": {"p_value": 0.034}, "deflated": {"probability": 0.96},
+             "gates": [{"name": "honest", "passed": True}], "grid": {"fast": [24]}, "folds": [], "holdout": None}
+    row = dict(zip(sync.COLUMNS, sync.to_row(entry, has_report=True)))
+    assert row["symbols"] == '["BTC/USD"]' and row["oos_sharpe"] == 0.92 and row["p_value"] == 0.034
+    assert row["dirty"] == 0 and row["has_report"] == 1 and row["holdout"] is None
+
+    d1 = D1("db", account_id="acct", token="tok")
+    inserted = []
+    monkeypatch.setattr(d1, "query", lambda sql, params=None: [{"id": "abc123def456"}])
+    monkeypatch.setattr(d1, "insert_many", lambda table, cols, rows: inserted.extend(rows) or len(rows))
+    assert sync.sync_ledger(d1, [entry]) == 0                       # already in D1
+    assert sync.sync_ledger(d1, [entry, {**entry, "id": "ffffffffffff"}]) == 1
+    assert inserted[0][0] == "ffffffffffff"
+
+
+def test_r2_pull_skips_report_cards(tmp_path):
+    s3 = FakeS3()
+    s3.objects = {"bars/coinbase/BTC-USD.parquet": b"data", "reports/abc.html": b"<html>"}
+    assert r2.pull("b", s3, tmp_path) == 1
+    assert not (tmp_path / "reports").exists()

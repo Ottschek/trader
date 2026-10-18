@@ -4,8 +4,8 @@
 # local data and outputs
 data/*
 !data/.gitkeep
-reports/
-logs/
+/reports/
+/logs/
 
 # python
 .venv/
