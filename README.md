@@ -46,6 +46,10 @@ Stored as Parquet under `data/` (git-ignored), queryable with DuckDB via `trader
   `scripts/validate.py` publishes each run there; `scripts/sync_ledger.py` resyncs everything; the collector also
   copies any committed ledger entries D1 is missing. Deploy with `npm run deploy` in `web/`.
 
+- **Paper trading** (M5, shadow experiment): see `config/paper.yaml` and docs/plan.md. The Worker trades the
+  Alpaca paper account at 09:00 New York; `scripts/paper_plan.py` recomputes the position plan;
+  `scripts/set_telegram_webhook.py <worker-url>` connects the Telegram commands (/status, /stop, /resume).
+
 Setup: fill in `.env` (see `.env.example`), check it with `.venv/bin/python scripts/check_setup.py`,
 then upload the same values to GitHub with `gh secret set -f .env`.
 

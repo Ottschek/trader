@@ -10,6 +10,10 @@ const devFixture = {
       res.setHeader("Content-Type", "application/json");
       res.end(readFileSync(new URL("./dev/health.json", import.meta.url)));
     });
+    server.middlewares.use("/api/paper", (_req, res) => {
+      res.setHeader("Content-Type", "application/json");
+      res.end(readFileSync(new URL("./dev/paper.json", import.meta.url)));
+    });
     server.middlewares.use("/api/experiments", (_req, res) => {
       res.setHeader("Content-Type", "application/json");
       res.end(readFileSync(new URL("./dev/experiments.json", import.meta.url)));

@@ -4,3 +4,4 @@ dist/
 .dev.vars
 dev/health.json
 dev/experiments.json
+dev/paper.json

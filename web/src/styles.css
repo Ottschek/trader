@@ -135,3 +135,13 @@ main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .ledger a { color: #2a78d6; font-weight: 550; text-decoration: none; }
 .ledger a:hover { text-decoration: underline; }
 .card > .small:last-child { margin: 12px 0 0; }
+
+/* paper trading */
+.shadow-banner { display: flex; gap: 14px; align-items: flex-start; background: var(--warning-bg); border-color: #f1d48a; }
+.shadow-banner p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; }
+.shadow-icon { font-size: 26px; line-height: 1; }
+.equity-svg { width: 100%; height: auto; display: block; }
+.equity-line { fill: none; stroke: #2a78d6; stroke-width: 2; stroke-linejoin: round; }
+.grid-line { stroke: var(--border); stroke-width: 1; }
+.axis-text { fill: var(--text-2); font-size: 11px; }
+.details { white-space: normal; min-width: 180px; }

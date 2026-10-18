@@ -193,10 +193,26 @@ Notes:
 - Engine fix found while building M4: decisions only fill once every bar they could see has closed (mixed
   crypto :00 / stock :30 bars), so no strategy can use a crypto bar that closes after the stock trade.
 
-### M5 — Paper trading
+### M5 — Paper trading (built 2026-10-18; running as a SHADOW EXPERIMENT)
 Hourly runner sends the best candidate's orders to Alpaca paper through the risk manager:
 max 10% per position, stop for the day after −3%, kill switch at −15% total drawdown.
 ✅ Done when it runs 2 weeks without crashing and every order is explainable from the logs.
+
+No strategy has passed every gate yet, so the pipeline runs **weekend_gap_sized as a shadow experiment**
+(5 of 6 gates; failed deflated Sharpe). Purpose: genuinely new, forward out-of-sample evidence. Not a candidate.
+- **Frozen rules:** `config/paper.yaml` (threshold 6%, target vol 2%, picked on pre-holdout data; start 2026-10-19).
+- **Who does what:** the collector computes position sizes with the strategy's own code (`paper_plans` in D1);
+  the Cloudflare Worker decides at **09:00 New York** whether BTC moved enough since the last stock close
+  (Coinbase candles, as in the backtest), places **market-on-open** orders (fill 09:30, as in the backtest),
+  exits at the next open, refreshes orders, snapshots equity hourly and runs the risk manager every 30 min.
+- **Safety:** paper endpoint hard-coded, keys must start with `PK`, duplicate firings can't double-order,
+  stale plans are skipped with an alert, Worker settings are tested against `config/paper.yaml`.
+- **Telegram:** a ping for every decision, order and fill; `/status`, `/stop` (close + halt), `/resume`,
+  accepted only from your chat via a secret webhook.
+- **Web:** Paper tab (`#/paper`) with the shadow label, equity, plan, every decision and every order vs its
+  sizing price.
+- Known difference from the backtest: on a Monday holiday the live bot decides on Tuesday morning with
+  Tuesday's BTC move (the backtest used Monday 08:00's).
 
 ### M6 — Monitoring
 Web app gains live-vs-backtest comparison on top of the views added in M1–M5.
