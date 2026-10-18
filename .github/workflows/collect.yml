@@ -1,9 +1,11 @@
 name: Hourly collector
 
 on:
+  # Normally started every hour at :05 UTC by the Cloudflare scheduler (cloudflare/scheduler).
+  # GitHub's own cron is kept as a backup only: it often starts runs hours late.
   schedule:
-    - cron: "7 * * * *"   # every hour at :07 UTC (the top of the hour is GitHub's busiest time)
-  workflow_dispatch:       # "Run workflow" button, and later the web app's job trigger
+    - cron: "7 * * * *"
+  workflow_dispatch:       # scheduler, "Run workflow" button, and later the web app's job trigger
 
 # Never run two collectors at once; a new run waits for the previous one.
 concurrency:

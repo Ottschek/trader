@@ -1,11 +1,8 @@
 name: Daily summary
 
 on:
-  schedule:
-    # GitHub cron is UTC only. 08:00 and 22:30 Vienna fall on different UTC hours in summer
-    # and winter, so fire at both; scripts/summary.py only sends at the right local time.
-    - cron: "0 6,7 * * *"
-    - cron: "30 20,21 * * *"
+  # Started at 08:00 and 22:30 Vienna time by the Cloudflare scheduler (cloudflare/scheduler).
+  # GitHub's own cron started these runs hours late, so it isn't used here.
   workflow_dispatch:
 
 permissions:

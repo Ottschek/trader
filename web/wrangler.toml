@@ -1,0 +1,14 @@
+# Cloudflare Pages project for the web app. Functions in functions/ read D1 through the DB binding.
+name = "trader-web"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "trader"
+database_id = "a4287e14-2892-4a4f-9953-a6bab17c2716"
+
+[vars]
+# Filled in after Cloudflare Access is set up. Until then every /api request is refused.
+ACCESS_TEAM_DOMAIN = ""   # e.g. "yourteam.cloudflareaccess.com"
+ACCESS_AUD = ""           # the Access application's "Application Audience (AUD) Tag"

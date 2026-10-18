@@ -1,0 +1,20 @@
+{
+  "name": "trader-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test test/*.test.mjs",
+    "deploy": "vite build && wrangler pages deploy dist --project-name trader-web --branch main"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "vite": "6.0.7",
+    "wrangler": "^4.0.0"
+  }
+}

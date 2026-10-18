@@ -1,0 +1,22 @@
+# Reliable clock for the GitHub Actions jobs. GitHub's own cron often starts hours late;
+# Cloudflare cron triggers fire on time and start the workflows via the GitHub API.
+name = "trader-scheduler"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = false   # no public URL: this Worker only runs on its schedule
+
+[triggers]
+crons = [
+  "5 * * * *",   # every hour at :05 UTC -> hourly collector
+  "0 * * * *",   # on the hour  -> daily summary if it's 08:00 in Vienna
+  "30 * * * *",  # on the half hour -> daily summary if it's 22:30 in Vienna
+]
+
+[vars]
+GITHUB_REPO = "Ottschek/trader"
+TIMEZONE = "Europe/Vienna"
+SUMMARY_TIMES = "08:00,22:30"
+
+# Secrets (set with `npx wrangler secret put NAME`, never in this file):
+#   GITHUB_DISPATCH_TOKEN  fine-grained token, Actions read & write on Ottschek/trader only
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  to report if starting a run fails

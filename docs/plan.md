@@ -71,7 +71,8 @@ Design rules:
 - M1 builds the historical backfill and the hourly collector together.
 
 **Running it**
-- GitHub Actions runs the hourly collector (free on a public repo).
+- GitHub Actions runs the hourly collector (free on a public repo). A Cloudflare Worker cron (`cloudflare/scheduler`)
+  starts it every hour at :05 and the summaries on time, because GitHub's own cron started runs hours late.
 - Telegram bot sends: failures and broken checks, a status summary at 08:00 and 22:30 Vienna time, and every paper trade (from M5).
   It also obeys `/stop` from your chat ID as a backup kill switch.
 
