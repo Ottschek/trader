@@ -23,10 +23,12 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from trader.data.quality import bad_tick_mask
 from trader.data.sessions import NY
 from trader.data.store import bars_path, corporate_actions_path, funding_path, read
 
 SPIKE_THRESHOLD = {"crypto": 0.25, "stock": 0.15}
+CROSS_SOURCE_TOLERANCE = 0.05   # an Alpaca crypto close this far from Coinbase's is bad data
 
 
 @dataclass
@@ -40,6 +42,7 @@ class MarketData:
     venue: dict[str, str]    # symbol -> cost venue in settings.costs
     cleaned: dict[str, int] = field(default_factory=dict)  # bad ticks flattened per symbol
     funding: pd.DataFrame | None = None  # Hyperliquid hourly funding rate per crypto symbol (if loaded)
+    raw_close: pd.DataFrame | None = None  # unadjusted close (real traded price), for dollar volume
 
     @property
     def index(self) -> pd.DatetimeIndex:
@@ -54,20 +57,20 @@ class MarketData:
         cut = lambda df: df.loc[:ts]  # noqa: E731
         return MarketData(cut(self.close), cut(self.open), cut(self.volume), cut(self.gap),
                           cut(self.intra), cut(self.tradable), self.venue, self.cleaned,
-                          cut(self.funding) if self.funding is not None else None)
+                          cut(self.funding) if self.funding is not None else None,
+                          cut(self.raw_close) if self.raw_close is not None else None)
 
 
 # --- per-asset preparation -----------------------------------------------------
 
 def flatten_spikes(bars: pd.DataFrame, threshold: float) -> tuple[pd.DataFrame, int]:
-    """Replace spike-and-revert bad ticks (a huge 1-bar move that immediately reverses)
-    with a flat bar at the previous close. Uses the next bar to spot them, which is a
-    deliberate, conservative exception: bad ticks would otherwise hand fake profits to
-    any strategy that buys dips."""
+    """Replace bad ticks (see quality.bad_tick_mask: a 1-bar spike that reverses on thin volume)
+    with a flat bar at the previous close. Uses the next bar to spot them, a deliberate,
+    conservative exception: bad ticks would otherwise hand fake profits to dip buyers. Real
+    violent moves trade on heavy volume and are kept, so backtests still feel real crashes."""
     if len(bars) < 3:
         return bars, 0
-    r = np.log(bars["close"]).diff()
-    bad = (r.abs() > threshold) & (r.shift(-1).abs() > threshold) & (np.sign(r) != np.sign(r.shift(-1)))
+    bad = bad_tick_mask(bars, threshold)
     if not bad.any():
         return bars, 0
     out = bars.copy()
@@ -134,12 +137,13 @@ def load_market(crypto=(), stocks=(), start=None, end=None, stock_session="regul
     """Build aligned tables for the given symbols. `stock_session`: "regular" or "all".
     `funding=True` also loads Hyperliquid funding rates for the crypto symbols. A rate
     stamped at hour h was settled at h, so it is known by the close of the bar starting at h."""
-    cols: dict[str, dict[str, pd.Series]] = {k: {} for k in ("close", "open", "volume", "gap", "intra")}
+    cols: dict[str, dict[str, pd.Series]] = {k: {} for k in ("close", "open", "volume", "gap", "intra", "raw_close")}
     venue, cleaned = {}, {}
 
     def add(symbol, sig: pd.DataFrame, exe: pd.DataFrame):
         c, o = adjusted_prices(sig)
         cols["close"][symbol], cols["open"][symbol], cols["volume"][symbol] = c, o, sig["volume"]
+        cols["raw_close"][symbol] = sig["close"]
         cols["gap"][symbol], cols["intra"][symbol] = exe["gap"], exe["intra"]
 
     for s in crypto:
@@ -155,7 +159,12 @@ def load_market(crypto=(), stocks=(), start=None, end=None, stock_session="regul
             ar = asset_returns(al)
             # Alpaca return only where Alpaca has this bar and the one an hour before it
             consecutive = ar.index.to_series().diff() == pd.Timedelta(hours=1)
-            use = ar.index[consecutive.values].intersection(exe.index)
+            # and only where Alpaca agrees with Coinbase on this bar and the one before (bad Alpaca
+            # prints, e.g. DOGE at 0.19-0.31 on 2023-05-23, fall back to Coinbase's return)
+            cb_close = sig["close"].reindex(ar.index)
+            agrees = ((ar["close"] / cb_close - 1).abs() <= CROSS_SOURCE_TOLERANCE)
+            ok = consecutive & agrees & agrees.shift(1, fill_value=False)
+            use = ar.index[ok.values].intersection(exe.index)
             exe.loc[use, ["gap", "intra"]] = ar.loc[use, ["gap", "intra"]].values
         add(s, sig, exe)
         venue[s] = "alpaca_crypto"
@@ -186,5 +195,5 @@ def load_market(crypto=(), stocks=(), start=None, end=None, stock_session="regul
     return MarketData(
         close=frames["close"], open=frames["open"], volume=frames["volume"],
         gap=frames["gap"].fillna(0.0), intra=frames["intra"].fillna(0.0),
-        tradable=tradable, venue=venue, cleaned=cleaned, funding=funding_frame,
+        tradable=tradable, venue=venue, cleaned=cleaned, funding=funding_frame, raw_close=frames["raw_close"],
     )

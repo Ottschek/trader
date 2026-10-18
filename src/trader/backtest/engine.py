@@ -36,6 +36,7 @@ class BacktestResult:
     turnover: pd.Series    # sum of |traded weight| per bar
     costs: pd.Series       # trading costs per bar, as a fraction of equity
     trades: int            # number of (asset, bar) fills
+    traded: pd.DataFrame | None = None   # traded weight per asset and bar (signed), for capacity estimates
 
 
 class BacktestError(ValueError):
@@ -72,6 +73,7 @@ def run_backtest(data: MarketData, targets: pd.DataFrame, cost_bps: dict[str, fl
     weights = np.empty((n, m))
     turnover = np.zeros(n)
     costs = np.zeros(n)
+    traded = np.zeros((n, m))
     trades = 0
     eq = 1.0
 
@@ -87,6 +89,7 @@ def run_backtest(data: MarketData, targets: pd.DataFrame, cost_bps: dict[str, fl
             change = tradable[t] & ~np.isclose(desired, executed, atol=1e-12)
             if change.any():
                 dw = desired[change] - w[change]
+                traded[t, change] = dw
                 c = float(np.abs(dw) @ cost[change])
                 w[change] = desired[change]
                 executed[change] = desired[change]
@@ -110,4 +113,5 @@ def run_backtest(data: MarketData, targets: pd.DataFrame, cost_bps: dict[str, fl
         turnover=pd.Series(turnover, index=data.index),
         costs=pd.Series(costs, index=data.index),
         trades=trades,
+        traded=pd.DataFrame(traded, index=data.index, columns=data.symbols),
     )

@@ -119,6 +119,20 @@ def _metrics_rows(card) -> str:
                    f"<td class='num'>{fmt(card.benchmark_oos[k])}</td></tr>" for label, k, fmt in rows)
 
 
+def _usd(v) -> str:
+    if v is None:
+        return "n/a"
+    return f"${v / 1e9:.1f} billion" if v >= 1e9 else f"${v / 1e6:.1f} million" if v >= 1e6 else f"${v:,.0f}"
+
+
+def _capacity_line(card) -> str:
+    c = getattr(card, "capacity", None) or {}
+    if not c.get("trades"):
+        return ""
+    return (f"<p class='muted'>Capacity (rough upper bound): about <b>{_usd(c['p10_usd'])}</b> before 10% of trades would "
+            f"exceed {c['participation']:.0%} of a stock's average daily dollar volume (median trade: {_usd(c['median_usd'])}).</p>")
+
+
 def render(card) -> str:
     cls, title, blurb = VERDICT[card.verdict]
     icon = {"ok": "✓", "fail": "✕"}[cls]
@@ -187,7 +201,8 @@ walk-forward {card.train_years * 12:.0f}-month train / {card.test_months}-month 
 <section class="card"><h2>Out-of-sample equity (walk-forward, log scale)</h2>{_equity_svg(card.equity, card.benchmark_equity)}
 <div class="legend"><span><span class="sw strat-bg"></span>Strategy</span><span><span class="sw bench-bg"></span>Buy-and-hold {escape(card.benchmark)}</span></div></section>
 <section class="card"><h2>Out-of-sample metrics</h2><div class="tw"><table><thead><tr><th></th><th class="num">Strategy</th>
-<th class="num">Hold {escape(card.benchmark)}</th></tr></thead><tbody>{_metrics_rows(card)}</tbody></table></div></section>
+<th class="num">Hold {escape(card.benchmark)}</th></tr></thead><tbody>{_metrics_rows(card)}</tbody></table></div>
+{_capacity_line(card)}</section>
 <section class="card"><h2>Random-timing test</h2><p class="muted">The strategy's in-market periods shuffled
 {card.random_entry["trials"]} times. p = {card.random_entry["p_value"]:.3f}: share of shuffles that did at least as well.</p>
 {_random_svg(card.random_sharpes, card.random_entry["strategy_sharpe"])}</section>

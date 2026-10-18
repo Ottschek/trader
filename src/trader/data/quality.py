@@ -55,14 +55,25 @@ def check_gaps(df: pd.DataFrame, dataset: str, warn_missing_pct: float = 1.0) ->
     return CheckResult("gaps", dataset, status, f"{missing} missing hours ({pct:.2f}%), longest gap {max_gap_h}h")
 
 
+def bad_tick_mask(df: pd.DataFrame, threshold: float, volume_ratio: float = 0.5) -> pd.Series:
+    """Bad ticks: a huge 1-bar move that immediately reverses AND trades on unusually thin volume
+    (under `volume_ratio` x the median of the past week's bars). Real crashes and pumps (May 2021,
+    the 2021 Dogecoin frenzy) reverse too, but on heavy volume, so they are kept."""
+    d = df.sort_values("ts")
+    r = np.log(d["close"]).diff()
+    spike = (r.abs() > threshold) & (r.shift(-1).abs() > threshold) & (np.sign(r) != np.sign(r.shift(-1)))
+    if "volume" in d:
+        usual = d["volume"].shift(1).rolling(168, min_periods=24).median()
+        spike &= (d["volume"] < volume_ratio * usual).fillna(False)
+    return spike.reindex(df.index).fillna(False)
+
+
 def check_spikes(df: pd.DataFrame, dataset: str, threshold: float = 0.25) -> CheckResult:
-    """Bad-tick heuristic: a huge 1-bar move that immediately reverses."""
+    """Bad-tick heuristic: a huge 1-bar move that immediately reverses on thin volume."""
     if len(df) < 3:
         return CheckResult("spikes", dataset, OK, "too little data")
-    r = np.log(df.sort_values("ts")["close"]).diff()
-    spikes = (r.abs() > threshold) & (r.shift(-1).abs() > threshold) & (np.sign(r) != np.sign(r.shift(-1)))
-    n = int(spikes.sum())
-    return CheckResult("spikes", dataset, WARN if n else OK, f"{n} spike-and-revert bars (>{threshold:.0%})")
+    n = int(bad_tick_mask(df, threshold).sum())
+    return CheckResult("spikes", dataset, WARN if n else OK, f"{n} thin-volume spike-and-revert bars (>{threshold:.0%})")
 
 
 def check_staleness(df: pd.DataFrame, dataset: str, now: pd.Timestamp, max_age_hours: float) -> CheckResult:

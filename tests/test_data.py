@@ -92,11 +92,16 @@ def test_gap_check_counts_missing_hours():
     assert "3 missing hours" in r.detail and "longest gap 3h" in r.detail
 
 
-def test_spike_check_flags_bad_tick_but_not_a_real_move():
-    ts = pd.date_range("2024-01-01", periods=5, freq="h", tz="UTC")
-    bad_tick = bars(ts, [100.0, 100.0, 300.0, 100.0, 100.0])
-    real_move = bars(ts, [100.0, 100.0, 300.0, 300.0, 300.0])
+def test_spike_check_flags_thin_bad_tick_but_not_real_moves():
+    ts = pd.date_range("2024-01-01", periods=40, freq="h", tz="UTC")
+    closes = [100.0] * 40
+    closes[30] = 300.0
+    bad_tick = bars(ts, closes)
+    bad_tick.loc[30, "volume"] = 0.5          # thin print
+    heavy = bars(ts, closes)                  # same shape, normal volume: a real (violent) move
+    real_move = bars(ts, [100.0] * 30 + [300.0] * 10)
     assert q.check_spikes(bad_tick, "x").status == q.WARN
+    assert q.check_spikes(heavy, "x").status == q.OK
     assert q.check_spikes(real_move, "x").status == q.OK
 
 

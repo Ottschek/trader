@@ -166,14 +166,45 @@ def test_regular_session_filter():
 # --- data cleaning -----------------------------------------------------------------
 
 def test_bad_tick_is_flattened_but_real_move_kept():
-    closes = [100, 100, 300, 100, 100, 100, 200, 200, 200]   # spike at bar 2, real jump at bar 6
-    opens = [100] + closes[:-1]
-    write_bars("coinbase", "TEST/USD", hours(len(closes)), opens, closes)
+    n = 60
+    closes = [100.0] * n
+    closes[40] = 300.0                       # thin bad print at bar 40, reverts at 41
+    closes[50:] = [200.0] * (n - 50)         # real jump at bar 50 that stays
+    opens = [100.0] + closes[:-1]
+    write_bars("coinbase", "TEST/USD", hours(n), opens, closes)
+    df = pd.read_parquet(bars_path("coinbase", "TEST/USD"))
+    df.loc[40, "volume"] = 0.1               # bad prints trade almost nothing
+    df.to_parquet(bars_path("coinbase", "TEST/USD"), index=False)
     data = load_market(crypto=["TEST/USD"])
     assert data.cleaned["TEST/USD"] == 1
-    assert data.close["TEST/USD"].iloc[2] == pytest.approx(100.0)
+    assert data.close["TEST/USD"].iloc[40] == pytest.approx(100.0)
     assert data.close["TEST/USD"].iloc[-1] == pytest.approx(200.0)
-    assert load_market(crypto=["TEST/USD"], clean=False).close["TEST/USD"].iloc[2] == pytest.approx(300.0)
+    assert load_market(crypto=["TEST/USD"], clean=False).close["TEST/USD"].iloc[40] == pytest.approx(300.0)
+
+
+def test_real_crash_on_heavy_volume_is_not_cleaned():
+    n = 60
+    closes = [100.0] * n
+    closes[40] = 60.0                        # crash and rebound, like May 19 2021
+    opens = [100.0] + closes[:-1]
+    write_bars("coinbase", "TEST/USD", hours(n), opens, closes)
+    df = pd.read_parquet(bars_path("coinbase", "TEST/USD"))
+    df.loc[40, "volume"] = 5.0               # heavy trading
+    df.to_parquet(bars_path("coinbase", "TEST/USD"), index=False)
+    data = load_market(crypto=["TEST/USD"])
+    assert data.cleaned["TEST/USD"] == 0
+    assert data.close["TEST/USD"].iloc[40] == pytest.approx(60.0)
+
+
+def test_bad_alpaca_crypto_bar_falls_back_to_coinbase():
+    n = 40
+    write_bars("coinbase", "TEST/USD", hours(n), [100.0] * n, [100.0] * n)
+    alp = [100.0] * n
+    alp[20] = 190.0                          # Alpaca-only bad print
+    write_bars("alpaca_crypto", "TEST/USD", hours(n), [100.0] + alp[:-1], alp)
+    data = load_market(crypto=["TEST/USD"], clean=False)
+    assert data.intra["TEST/USD"].abs().max() == pytest.approx(0.0)
+    assert data.gap["TEST/USD"].abs().max() == pytest.approx(0.0)
 
 
 # --- lookahead check ---------------------------------------------------------------
@@ -233,3 +264,20 @@ def test_mixed_timing_never_fills_before_the_decision_bar_closed():
     filled = r.turnover[r.turnover > 0].index[0]
     assert filled >= decide + pd.Timedelta(hours=1)       # not at the 10:30 stock open
     assert filled == ts[2]                                # but at 11:30, the first open after 11:00
+
+
+def test_capacity_matches_hand_calculation():
+    from trader.backtest.capacity import estimate_capacity
+    ts = pd.date_range("2024-01-01", periods=24 * 40, freq="h", tz="UTC")
+    write_bars("coinbase", "TEST/USD", ts, [50.0] * len(ts), [50.0] * len(ts))   # volume 1 per bar
+    df = pd.read_parquet(bars_path("coinbase", "TEST/USD"))
+    df["volume"] = 1000.0                                                        # 1000 units/hour at $50
+    df.to_parquet(bars_path("coinbase", "TEST/USD"), index=False)
+    data = load_market(crypto=["TEST/USD"])
+    targets = pd.DataFrame({"TEST/USD": 0.0}, index=data.index)
+    targets.loc[ts[24 * 30]:, "TEST/USD"] = 0.5                                  # buy half the account on day 30
+    r = run_backtest(data, targets, {"TEST/USD": 0.0})
+    cap = estimate_capacity(r, data, participation=0.01)
+    adv = 24 * 1000 * 50.0                                                       # $1.2M a day
+    assert cap["trades"] == 1
+    assert cap["p10_usd"] == pytest.approx(0.01 * adv / 0.5)                     # = $24,000

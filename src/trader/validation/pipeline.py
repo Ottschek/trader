@@ -12,11 +12,13 @@ Only a strategy that passes all six may look at the locked holdout, once, with c
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import asdict, dataclass, field, replace
 
 import pandas as pd
 
+from trader.backtest.capacity import estimate_capacity
 from trader.backtest.data import MarketData
 from trader.backtest.engine import BacktestResult, run_backtest
 from trader.backtest.lookahead import check_no_lookahead
@@ -69,6 +71,7 @@ class ReportCard:
     random_entry: dict = field(default_factory=dict)
     deflated: dict = field(default_factory=dict)
     lookahead_problems: list[str] = field(default_factory=list)
+    capacity: dict = field(default_factory=dict)   # informational: account size before trades move prices
     holdout: dict | None = None
     # kept in memory for the HTML report, not written to the ledger
     equity: pd.Series | None = None
@@ -158,6 +161,12 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
         Gate("deflated", "Deflated Sharpe", dsr.probability >= v.min_deflated_sharpe,
              f"{dsr.probability:.2f} ({dsr.trials} trials)", f">= {v.min_deflated_sharpe:.2f}"),
     ]
+    # capacity of the parameter set the walk-forward picked most often
+    picks = [json.dumps(c, sort_keys=True) for c in wf.chosen]
+    favourite = max(set(picks), key=picks.count)
+    fav_result = wf.combo_results[[json.dumps(c, sort_keys=True) for c in wf.combos].index(favourite)]
+    capacity = {**estimate_capacity(fav_result, data), "params": json.loads(favourite)}
+
     code = ledger.code_version()
     card = ReportCard(
         id=uuid.uuid4().hex[:12],
@@ -177,7 +186,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
                       "trials": int(len(rnd.random_sharpes))},
         deflated={"probability": round(dsr.probability, 4), "sharpe_per_bar": round(dsr.sharpe, 6),
                   "expected_max_per_bar": round(dsr.expected_max, 6), "trials": dsr.trials, "bars": dsr.bars},
-        lookahead_problems=problems[:20],
+        lookahead_problems=problems[:20], capacity=capacity,
         equity=wf.oos.equity, benchmark_equity=wf.benchmark_oos.equity,
         random_sharpes=[float(x) for x in rnd.random_sharpes], trial_sharpes=wf.combo_sharpes,
     )
