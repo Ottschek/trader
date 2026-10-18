@@ -174,3 +174,24 @@ def test_combo_sleeves_splits_the_account_in_thirds_and_is_honest():
     assert w.sum(axis=1).max() <= 1.0 + 1e-9
     assert w["SPY"].max() <= 1 / 3 + 1e-9 and w[CRYPTO_BASKET].sum(axis=1).max() <= 1 / 3 + 1e-9
     assert check_no_lookahead(strat, data) == []
+
+
+def test_darwin_genomes_stay_in_bounds_and_evolved_rules_are_honest():
+    import importlib.util
+    import pathlib
+    spec = importlib.util.spec_from_file_location("darwin", pathlib.Path(__file__).parents[1] / "scripts" / "darwin.py")
+    darwin = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(darwin)
+    from trader.strategies.evolved import GENE_SPACE, EvolvedRule
+    rng = np.random.default_rng(0)
+    g = darwin.random_genome(rng)
+    for _ in range(200):
+        g = darwin.mutate(darwin.crossover(g, darwin.random_genome(rng), rng), rng)
+        for k, (lo, hi) in GENE_SPACE.items():
+            assert lo <= g[k] <= hi, k
+        assert g["use_mom"] or g["use_sma"] or g["use_vol"]
+    crypto_walk("AAA/USD", seed=11, days=400, drift=0.0002)
+    data = load_market(crypto=["AAA/USD"])
+    strat = EvolvedRule(["AAA/USD"], genes={"use_mom": 1, "mom_days": 20, "mom_min": 0.0, "use_sma": 1, "sma_days": 50,
+                                            "sma_ratio": 1.0, "use_vol": 1, "vol_max": 0.08})
+    assert check_no_lookahead(strat, data) == []

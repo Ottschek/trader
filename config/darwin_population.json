@@ -1,0 +1,144 @@
+{
+ "evolved_on": [
+  "2016-01-01",
+  "2017-12-31 23:59"
+ ],
+ "symbols": [
+  "BTC/USD",
+  "ETH/USD"
+ ],
+ "seed": 0,
+ "evaluated": 2000,
+ "survivors": [
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.060615979026217334,
+    "use_sma": 1,
+    "sma_days": 250,
+    "sma_ratio": 0.9557561968947752,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.196
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.060615979026217334,
+    "use_sma": 1,
+    "sma_days": 246,
+    "sma_ratio": 0.9557561968947752,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.196
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.07028121972824923,
+    "use_sma": 1,
+    "sma_days": 242,
+    "sma_ratio": 0.9192516406077288,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.192
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.07028121972824923,
+    "use_sma": 1,
+    "sma_days": 143,
+    "sma_ratio": 0.9734770478730801,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.176
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.08406187758743808,
+    "use_sma": 1,
+    "sma_days": 264,
+    "sma_ratio": 0.9192516406077288,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.173
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.07028121972824923,
+    "use_sma": 1,
+    "sma_days": 264,
+    "sma_ratio": 0.9275236919234598,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.173
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.07028121972824923,
+    "use_sma": 1,
+    "sma_days": 264,
+    "sma_ratio": 0.9,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.173
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.07028121972824923,
+    "use_sma": 1,
+    "sma_days": 264,
+    "sma_ratio": 0.9275236919234598,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.173
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.07028121972824923,
+    "use_sma": 1,
+    "sma_days": 276,
+    "sma_ratio": 0.9295388934092245,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.126
+  },
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 80,
+    "mom_min": 0.09786953324544312,
+    "use_sma": 1,
+    "sma_days": 264,
+    "sma_ratio": 0.9411909516627308,
+    "use_vol": 1,
+    "vol_max": 0.06701551724831124
+   },
+   "in_sample_sharpe": 4.12
+  }
+ ]
+}

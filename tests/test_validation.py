@@ -177,3 +177,10 @@ def test_gate_results_are_stored_as_real_booleans(settings):
     raw = ledger.ledger_path().read_text()
     assert '"passed": "' not in raw                       # never the strings "True"/"False"
     assert all(isinstance(g["passed"], bool) for g in json.loads(raw.splitlines()[0])["gates"])
+
+
+def test_extra_trials_count_toward_the_ledger(settings):
+    random_walk()
+    card = validate(RandomEntry, ["TEST/USD"], settings, grid={"seed": [1], "p_enter": [0.02], "hold": [24]},
+                    benchmark="TEST/USD", extra_trials=99)
+    assert card.trials == 100 and ledger.total_trials() == 100

@@ -58,3 +58,17 @@ def upload_report(s3, bucket: str, card_id: str, html: str) -> str:
 
 def local_report(card_id: str, directory: Path) -> Path | None:
     return next(iter(sorted(directory.glob(f"*-{card_id}.html"))), None)
+
+
+def publish_card(card, path: Path) -> str:
+    """Upload a report card to R2 and its ledger entry to D1 (best effort, for the Strategy lab)."""
+    from trader.config import load_settings
+    from trader.data import r2
+
+    try:
+        cloud = load_settings().cloud
+        upload_report(r2.client(), cloud.r2_bucket, card.id, path.read_text())
+        sync_ledger(D1(cloud.d1_database_id), [card.ledger_entry()], reported={card.id}, only_missing=False)
+        return "Published to the Strategy lab: https://trader-web-6t6.pages.dev/#/lab"
+    except Exception as e:  # noqa: BLE001 - publishing is best-effort
+        return f"(Not published to the web app: {type(e).__name__}: {e})"

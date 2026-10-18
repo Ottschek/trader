@@ -107,9 +107,11 @@ def _slice_result(r: BacktestResult, start) -> BacktestResult:
 def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None, data: MarketData | None = None,
              benchmark: str | None = None, holdout: bool = False, record: bool = True, seed: int = 0,
              validation: ValidationSettings | None = None, train_months: int | None = None,
-             test_months: int | None = None) -> ReportCard:
+             test_months: int | None = None, extra_trials: int = 0) -> ReportCard:
     """`train_months`/`test_months` override the walk-forward windows for ideas whose data is
-    too short for the defaults (e.g. funding history starts 2023). The override is recorded."""
+    too short for the defaults (e.g. funding history starts 2023). The override is recorded.
+    `extra_trials`: candidates tried before this run that aren't in the grid (e.g. every genome
+    Darwin evaluated); they count toward the deflated Sharpe like any other trial."""
     v = validation or settings.validation
     if train_months or test_months:
         v = replace(v, train_years=(train_months or v.train_years * 12) / 12, test_months=test_months or v.test_months)
@@ -145,7 +147,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
     rnd = random_entry_test(wf.oos_targets, data, costs, trials=v.random_trials, seed=seed)
 
     # 6. deflated Sharpe, counting every trial ever run
-    trials = len(wf.combos)
+    trials = len(wf.combos) + extra_trials
     dsr = deflated_sharpe(wf.oos.returns, prior_trials + trials, prior_sharpes + wf.combo_sharpes)
 
     gates = [
