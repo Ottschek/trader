@@ -18,6 +18,7 @@ cp .env.example .env   # then put your Alpaca PAPER keys in .env
 .venv/bin/python scripts/check_account.py # M0: log into the paper account, print balance
 .venv/bin/python scripts/collect.py       # M1: backfill / hourly update of all data + quality checks
 .venv/bin/python scripts/run_backtest.py sma --symbols BTC/USD -p fast=72 -p slow=480   # M2: backtest vs buy-and-hold
+.venv/bin/python scripts/validate.py sma --symbols BTC/USD    # M3: full validation, logged in the ledger
 ```
 
 ## Data

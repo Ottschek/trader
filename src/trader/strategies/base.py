@@ -18,6 +18,7 @@ from trader.backtest.data import MarketData
 
 class Strategy:
     name = "strategy"
+    default_grid: dict[str, list] = {}   # parameter values the validation walk-forward tries
 
     def __init__(self, symbols, **params):
         self.symbols = list(symbols)

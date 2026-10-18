@@ -153,9 +153,21 @@ How it works (`src/trader/backtest/`):
   when later data is added, the result is flagged invalid (catches shift(-1) cheats and full-sample statistics).
 - Run: `.venv/bin/python scripts/run_backtest.py sma --symbols BTC/USD -p fast=72 -p slow=480`
 
-### M3 — Validation harness + ledger
+### M3 — Validation harness + ledger ✅ (built 2026-10-18)
 Walk-forward, holdout locked in code, Monte Carlo, deflated Sharpe, standard report card, every run logged.
-✅ Done when random-entry strategies get rejected every time.
+✅ Done when random-entry strategies get rejected every time. (30/30 on real BTC, ETH, SPY history; 10/10 in tests.)
+
+How it works (`src/trader/validation/`, rules in `config/settings.yaml` → `validation`):
+- **Locked holdout:** data from 2024-10-18 on is invisible to research code (`research_market`). An idea (strategy +
+  symbols, regardless of parameters) gets one look, only after passing every gate, only with committed code.
+- **Walk-forward:** tune parameters on the prior 2 years, judge on the next 6 months, roll forward to the holdout.
+- **Gates:** honest (lookahead check for every parameter set) · out-of-sample Sharpe ≥ 1 · beats buy-and-hold ·
+  max drawdown ≥ −20% · beats 95% of random-timing shuffles of itself · deflated Sharpe ≥ 0.95 counting all trials.
+- **Ledger:** `ledger/experiments.jsonl`, one line per run including rejections (the graveyard), with git commit,
+  parameters tried, gate results and every trial's Sharpe. Commit it after each run.
+- **Report card:** HTML in `reports/` with verdict, gates, out-of-sample equity vs buy-and-hold, random-timing
+  histogram and the parameters picked in each fold.
+- Run: `.venv/bin/python scripts/validate.py sma --symbols BTC/USD` (add `--holdout` for the one-time look).
 
 ### M4 — First strategies
 Baselines: trend, mean reversion, regime filter. Crazy ideas using existing data: weekend gap predictor, funding rate signal.

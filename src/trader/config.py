@@ -46,6 +46,19 @@ class CloudSettings:
 
 
 @dataclass(frozen=True)
+class ValidationSettings:
+    research_start: str
+    holdout_start: str
+    train_years: float
+    test_months: int
+    min_oos_sharpe: float
+    max_oos_drawdown: float
+    max_p_value: float
+    min_deflated_sharpe: float
+    random_trials: int
+
+
+@dataclass(frozen=True)
 class Settings:
     timeframe: str
     history_start: str
@@ -55,6 +68,7 @@ class Settings:
     risk: RiskLimits
     costs: dict[str, VenueCosts]
     cloud: CloudSettings | None = None
+    validation: ValidationSettings | None = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +98,9 @@ def load_settings(path: Path = DEFAULT_SETTINGS_PATH) -> Settings:
         costs={venue: VenueCosts(**c) for venue, c in raw["costs"].items()},
         cloud=CloudSettings(**{**raw["cloud"], "summary_times": tuple(raw["cloud"]["summary_times"])})
         if "cloud" in raw else None,
+        validation=ValidationSettings(**{k: (str(v) if k.endswith("_start") else v)
+                                         for k, v in raw["validation"].items()})
+        if "validation" in raw else None,
     )
 
 

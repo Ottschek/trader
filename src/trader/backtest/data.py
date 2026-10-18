@@ -112,13 +112,18 @@ def adjusted_prices(r: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
 
 # --- loading ---------------------------------------------------------------------
 
+def _utc(t) -> pd.Timestamp:
+    t = pd.Timestamp(t)
+    return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+
+
 def _window(df: pd.DataFrame, start, end) -> pd.DataFrame:
     if df.empty:
         return df
     if start is not None:
-        df = df[df["ts"] >= pd.Timestamp(start, tz="UTC")]
+        df = df[df["ts"] >= _utc(start)]
     if end is not None:
-        df = df[df["ts"] <= pd.Timestamp(end, tz="UTC")]
+        df = df[df["ts"] <= _utc(end)]
     return df
 
 
