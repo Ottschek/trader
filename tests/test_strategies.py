@@ -125,3 +125,15 @@ def test_funding_contrarian_buys_after_negative_funding_spike():
     assert check_no_lookahead(strat, data) == []
     with pytest.raises(ValueError, match="funding"):
         strat.target_weights(load_market(crypto=["BTC/USD"]))
+
+
+def test_strategies_handle_a_coin_that_has_not_launched_yet():
+    crypto_walk("OLD/USD", start="2023-01-01", days=200, seed=6)
+    crypto_walk("NEW/USD", start="2023-05-01", days=50, seed=7)        # appears months later
+    data = load_market(crypto=["OLD/USD", "NEW/USD"])
+    early = data.until(pd.Timestamp("2023-03-01", tz="UTC"))            # NEW/USD has no bars yet
+    for strat in [TsMomentum(["OLD/USD", "NEW/USD"], lookback_days=7),
+                  DipBuyer(["OLD/USD", "NEW/USD"]), RegimeFilter(["OLD/USD", "NEW/USD"], sma_days=30)]:
+        w = strat.target_weights(early)
+        assert (w["NEW/USD"].fillna(0) == 0).all()
+        assert check_no_lookahead(strat, data) == []

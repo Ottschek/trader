@@ -19,6 +19,8 @@ def value_ago(series: pd.Series, delta: pd.Timedelta) -> pd.Series:
 
 def has_history(series: pd.Series, delta: pd.Timedelta) -> pd.Series:
     """True once the series has at least `delta` of history behind the bar."""
+    if series.empty:  # e.g. a coin that hadn't launched yet at this point in history
+        return pd.Series(False, index=series.index, dtype=bool)
     return pd.Series(series.index - series.index[0] >= delta, index=series.index)
 
 
