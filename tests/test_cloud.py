@@ -1,7 +1,5 @@
 import hashlib
 
-import pandas as pd
-import pytest
 
 from trader.data import quality as q
 from trader.data import r2
@@ -40,22 +38,6 @@ def test_no_alert_when_all_good_from_the_start():
 def test_alert_escapes_html():
     msg = report.failure_alert([q.CheckResult("download", "a<b>", q.FAIL, "x & y")], previous=[])
     assert "a&lt;b&gt;" in msg and "x &amp; y" in msg
-
-
-# --- summary timing ----------------------------------------------------------
-
-@pytest.mark.parametrize("utc, expected", [
-    ("2026-07-01 06:03", "08:00"),   # summer: Vienna = UTC+2
-    ("2026-07-01 07:03", None),      # summer, wrong hour (09:03 Vienna)
-    ("2026-01-15 07:05", "08:00"),   # winter: Vienna = UTC+1
-    ("2026-01-15 06:05", None),      # winter, 07:05 Vienna: too early
-    ("2026-07-01 20:41", "22:30"),   # summer evening, cron started 11 min late
-    ("2026-01-15 21:30", "22:30"),   # winter evening
-    ("2026-01-15 20:30", None),      # winter, 21:30 Vienna
-])
-def test_summary_time_handles_daylight_saving(utc, expected):
-    now = pd.Timestamp(utc, tz="UTC")
-    assert report.is_summary_time(now, "Europe/Vienna", ("08:00", "22:30")) == expected
 
 
 # --- D1 chunking -------------------------------------------------------------
@@ -114,3 +96,20 @@ def test_r2_push_only_uploads_changed_files_and_pull_restores_them(tmp_path):
     assert r2.pull("b", s3, fresh) == 1
     assert (fresh / "bars" / "coinbase" / "BTC-USD.parquet").read_bytes() == b"two"
     assert r2.pull("b", s3, fresh) == 0             # already up to date
+
+
+# --- Worker snapshots ----------------------------------------------------------
+
+def test_worker_snapshots_merge_into_parquet(tmp_path, monkeypatch):
+    from trader.data import hyperliquid, store
+    monkeypatch.setenv("TRADER_DATA_DIR", str(tmp_path))
+    row = {"ts": "2026-10-18T05:00:00+00:00", "taken_at": "2026-10-18T05:05:01+00:00", "coin": "BTC",
+           "open_interest": 42000.0, "funding_rate": 1.25e-05, "premium": None, "mark_px": 81636.0,
+           "oracle_px": 81656.7, "day_notional_volume": 2.4e9}
+    assert hyperliquid.merge_worker_snapshots([row, {**row, "coin": "ETH"}]) == 2
+    assert hyperliquid.merge_worker_snapshots([{**row, "open_interest": 43000.0}]) == 0   # same hour+coin: replaced
+    df = store.read(store.snapshots_path())
+    assert len(df) == 2
+    assert df.loc[df["coin"] == "BTC", "open_interest"].item() == 43000.0
+    assert str(df["ts"].dt.tz) == "UTC"
+    assert hyperliquid.merge_worker_snapshots([]) == 0

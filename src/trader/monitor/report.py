@@ -1,4 +1,5 @@
-"""What the collector reports after each run: D1 rows for the web app, Telegram alerts and summaries."""
+"""What the collector reports after each run: D1 rows for the web app and Telegram failure alerts.
+(Daily summaries are sent by the Cloudflare Worker in cloudflare/scheduler.)"""
 
 from __future__ import annotations
 
@@ -72,47 +73,3 @@ def failure_alert(results: list[q.CheckResult], previous: list[dict] | None) -> 
             mark = "🆕 " if (r.check, r.dataset) in new and before else "• "
             lines.append(f"{mark}{escape(r.check)} · {escape(r.dataset)}: {escape(r.detail)}")
     return "\n".join(lines[:40])
-
-
-# --- daily summary -----------------------------------------------------------
-
-def is_summary_time(now: pd.Timestamp, tz: str, times: tuple[str, ...], window_min: int = 50) -> str | None:
-    """Which configured summary time (if any) we're within `window_min` minutes after.
-
-    GitHub's cron only knows UTC and can start a few minutes late, so the summary
-    workflow fires at both possible UTC hours and this decides which run sends."""
-    local = now.tz_convert(tz)
-    for t in times:
-        hh, mm = map(int, t.split(":"))
-        target = local.normalize() + pd.Timedelta(hours=hh, minutes=mm)
-        if pd.Timedelta(0) <= local - target < pd.Timedelta(minutes=window_min):
-            return t
-    return None
-
-
-def summary_text(d1: D1, now: pd.Timestamp, tz: str) -> str:
-    since = (now - pd.Timedelta(hours=24)).isoformat()
-    runs = d1.query("SELECT status, rows_added FROM collector_runs WHERE run_at >= ?", [since])
-    latest = d1.query("SELECT run_at FROM collector_runs ORDER BY run_at DESC LIMIT 1")
-    datasets = d1.query("SELECT kind, count(*) AS n, sum(rows) AS rows FROM dataset_status GROUP BY kind ORDER BY kind")
-
-    local = now.tz_convert(tz)
-    lines = [f"📊 <b>Trader status</b> · {local:%a %d %b %H:%M}"]
-    if not runs:
-        lines.append("⚠️ No collector runs in the last 24h!")
-    else:
-        failed = sum(r["status"] == q.FAIL for r in runs)
-        added = sum(r["rows_added"] for r in runs)
-        lines.append(f"Runs (24h): {len(runs)}/24 · {failed} with failures · +{added:,} rows")
-    if latest:
-        problems = d1.query("SELECT status, check_name, dataset, detail FROM check_results "
-                            "WHERE run_at = ? AND status != 'ok' ORDER BY status, dataset",
-                            [latest[0]["run_at"]])
-        fails = [p for p in problems if p["status"] == q.FAIL]
-        warns = [p for p in problems if p["status"] == q.WARN]
-        lines.append(f"Latest run: {len(fails)} fail, {len(warns)} warn")
-        for p in fails[:10]:
-            lines.append(f"• ❌ {escape(p['check_name'])} · {escape(p['dataset'])}: {escape(p['detail'])}")
-    for d in datasets:
-        lines.append(f"{d['kind']}: {d['n']} files, {int(d['rows'] or 0):,} rows")
-    return "\n".join(lines)

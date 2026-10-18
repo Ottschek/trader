@@ -31,11 +31,16 @@ cp .env.example .env   # then put your Alpaca PAPER keys in .env
 
 Stored as Parquet under `data/` (git-ignored), queryable with DuckDB via `trader.data.store.connect()`.
 
-## Cloud (hourly run)
+## Cloud
 
-GitHub Actions runs `scripts/collect.py --cloud` every hour at :07 UTC: pull data from the private R2 bucket
-`trader-data` → collect → quality checks → record in D1 → push changed files → Telegram alert if failures change.
-`summary.yml` sends a Telegram status at 08:00 and 22:30 Vienna time.
+- **GitHub Actions** runs `scripts/collect.py --cloud` twice an hour (:07 and :37 UTC): pull data from the private
+  R2 bucket `trader-data` → collect → quality checks → record in D1 → push changed files → Telegram alert if the
+  set of failing checks changes. GitHub often starts these late; missed bars are caught up on the next run.
+- **Cloudflare Worker** (`cloudflare/scheduler`) does the time-critical jobs on Cloudflare's clock: records
+  Hyperliquid open interest every hour into D1, sends the Telegram summary at 08:00 and 22:30 Vienna time, and
+  alerts if the collector hasn't run for 6 hours. Deploy with `npx wrangler deploy` in that folder.
+- **Web app** (`web/`): public, read-only data health page at https://trader-web-6t6.pages.dev.
+  Deploy with `npm run deploy` in `web/`.
 
 Setup: fill in `.env` (see `.env.example`), check it with `.venv/bin/python scripts/check_setup.py`,
 then upload the same values to GitHub with `gh secret set -f .env`.

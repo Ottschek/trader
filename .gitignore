@@ -12,3 +12,7 @@ logs/
 __pycache__/
 *.egg-info/
 .pytest_cache/
+
+# wrangler local state
+.wrangler/
+node_modules/

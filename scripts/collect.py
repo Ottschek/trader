@@ -33,9 +33,10 @@ def coin_of(symbol: str) -> str:
     return symbol.split("/")[0]
 
 
-def download(sources, crypto, stocks, settings, now) -> tuple[list[q.CheckResult], int]:
+def download(sources, crypto, stocks, settings, now, snapshot=True) -> tuple[list[q.CheckResult], int]:
     """Run every downloader; a failure in one symbol is recorded and the rest carry on.
-    Returns the failures and the total number of rows added."""
+    Returns the failures and the total number of rows added. `snapshot=False` skips our own
+    open interest snapshot (in cloud mode the Cloudflare Worker records it on time)."""
     results: list[q.CheckResult] = []
     added = 0
 
@@ -65,7 +66,8 @@ def download(sources, crypto, stocks, settings, now) -> tuple[list[q.CheckResult
         print("Hyperliquid funding + open interest")
         for s in crypto:
             run(f"funding {coin_of(s)}", hyperliquid.update_funding, coin_of(s))
-        run("hyperliquid snapshot", hyperliquid.snapshot, [coin_of(s) for s in crypto], now)
+        if snapshot:
+            run("hyperliquid snapshot", hyperliquid.snapshot, [coin_of(s) for s in crypto], now)
 
     if "alpaca_stocks" in sources:
         print("Alpaca stocks (30m -> session hourly) + corporate actions")
@@ -142,9 +144,10 @@ def main() -> int:
         from trader.data import r2
         print(f"Pulling data from R2 bucket {settings.cloud.r2_bucket}")
         print(f"  {r2.pull(settings.cloud.r2_bucket)} files downloaded")
+        merge_worker_snapshots(settings)
     previous = json.loads(out.read_text())["results"] if out.exists() else None
 
-    results, added = download(sources, crypto, stocks, settings, now)
+    results, added = download(sources, crypto, stocks, settings, now, snapshot=not args.cloud)
     results += run_checks(sources, crypto, stocks, now)
 
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -163,6 +166,17 @@ def main() -> int:
     if args.cloud:
         return 0  # failing checks were reported via Telegram; only a crash should fail the job
     return 1 if q.worst(results) == q.FAIL else 0
+
+
+def merge_worker_snapshots(settings) -> None:
+    """Copy open interest snapshots the Cloudflare Worker stored in D1 into the Parquet file."""
+    from trader.data.store import last_ts
+    from trader.monitor.d1 import D1
+
+    since = last_ts(snapshots_path())
+    rows = D1(settings.cloud.d1_database_id).query(
+        "SELECT * FROM oi_snapshots WHERE ts > ? ORDER BY ts", [since.isoformat() if since is not None else ""])
+    print(f"  {hyperliquid.merge_worker_snapshots(rows)} open interest snapshots merged from the Worker")
 
 
 def report_to_cloud(settings, now, results, previous, added, duration_s) -> None:

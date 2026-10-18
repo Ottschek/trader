@@ -82,3 +82,18 @@ def snapshot(coins: list[str], now: pd.Timestamp) -> int:
             "day_notional_volume": float(c["dayNtlVlm"]),
         })
     return upsert(snapshots_path(), pd.DataFrame(rows), key=["ts", "coin"])
+
+
+SNAPSHOT_COLUMNS = ["ts", "taken_at", "coin", "open_interest", "funding_rate", "premium",
+                    "mark_px", "oracle_px", "day_notional_volume"]
+
+
+def merge_worker_snapshots(rows: list[dict]) -> int:
+    """Add snapshots the Cloudflare Worker recorded in D1. It takes them on time every hour,
+    which GitHub's cron can't guarantee, so in cloud mode these replace our own snapshot."""
+    if not rows:
+        return 0
+    df = pd.DataFrame(rows)
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    df["taken_at"] = pd.to_datetime(df["taken_at"], utc=True)
+    return upsert(snapshots_path(), df[SNAPSHOT_COLUMNS], key=["ts", "coin"])
