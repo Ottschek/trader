@@ -148,7 +148,7 @@ def render(card) -> str:
   --text:#fff; --text2:#c3c2b7; --strat:#3987e5; --bench:#d95926; --goodbg:#163016; --critbg:#3a1a1a; --grid:#2e2e2b;
   --hist:#5a5954; color-scheme: dark; }} }}
 * {{ box-sizing: border-box; }}
-body {{ margin:0; background:var(--bg); color:var(--text); font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }}
+body {{ margin:0; background:var(--bg); color:var(--text); font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif; }}
 .page {{ max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; display:grid; gap:16px; }}
 h1 {{ font-size: 22px; margin: 0 0 4px; letter-spacing:-0.02em; }} h2 {{ font-size: 15px; margin: 0 0 12px; }}
 .muted {{ color: var(--text2); }}
