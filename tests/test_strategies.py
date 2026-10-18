@@ -137,3 +137,24 @@ def test_strategies_handle_a_coin_that_has_not_launched_yet():
         w = strat.target_weights(early)
         assert (w["NEW/USD"].fillna(0) == 0).all()
         assert check_no_lookahead(strat, data) == []
+
+
+def test_weekend_gap_sized_gives_volatile_stocks_smaller_positions():
+    from trader.strategies.ideas import WeekendGapSized
+    stock_ts = pd.DatetimeIndex([t for t in stock_hours(45, start="2023-11-27")])   # ~9 weeks of sessions
+    rng = np.random.default_rng(8)
+    write_bars("alpaca_stocks", "CALM", stock_ts, 50 * np.exp(np.cumsum(rng.normal(0, 0.004, len(stock_ts)))), session="regular")
+    write_bars("alpaca_stocks", "WILD", stock_ts, 50 * np.exp(np.cumsum(rng.normal(0, 0.02, len(stock_ts)))), session="regular")
+    btc_ts = pd.date_range("2023-11-26", "2024-02-01", freq="h", tz="UTC")
+    btc = np.full(len(btc_ts), 40_000.0)
+    btc[btc_ts >= pd.Timestamp("2024-01-13 12:00", tz="UTC")] *= 1.08     # weekend jump before Mon 15 Jan
+    write_bars("coinbase", "BTC/USD", btc_ts, btc)
+    data = load_market(crypto=["BTC/USD"], stocks=["CALM", "WILD"])
+
+    strat = WeekendGapSized(["CALM", "WILD"], threshold=0.05, target_vol=0.02)
+    w = strat.target_weights(data)
+    held = w[(w > 0).any(axis=1)]
+    assert len(held) > 0
+    assert held["WILD"].max() < held["CALM"].max() <= 0.5 + 1e-12       # risky stock gets less, cap is 1/n
+    assert held["CALM"].nunique() == 1 and held["WILD"].nunique() == 1  # size frozen during the trade
+    assert check_no_lookahead(strat, data) == []

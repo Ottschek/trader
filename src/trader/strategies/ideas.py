@@ -8,7 +8,7 @@ import pandas as pd
 from trader.backtest.data import MarketData
 from trader.data.sessions import NY
 from trader.strategies.base import Strategy
-from trader.strategies.helpers import hold_after
+from trader.strategies.helpers import has_history, hold_after
 
 WEEKEND = pd.Timedelta(hours=40)   # longer than any weekday overnight break (16.5 h)
 
@@ -32,12 +32,16 @@ class WeekendGap(Strategy):
         super().__init__(symbols, threshold=threshold, mode=mode)
 
     def target_weights(self, data: MarketData) -> pd.DataFrame:
+        position = self._positions(data, self.params["threshold"], self.params["mode"] == "follow")
+        w = position / len(self.symbols)
+        return pd.DataFrame({s: w for s in self.symbols}, index=data.index)
+
+    def _positions(self, data: MarketData, thr: float, follow: bool) -> np.ndarray:
+        """1.0 on rows where we want to hold the stocks, else 0.0 (entry/exit logic above)."""
         idx = data.index
         local = idx.tz_convert(NY)
-        btc = data.close["BTC/USD"]
         stock_bar = data.tradable[self.symbols].any(axis=1).to_numpy()
-        btc_vals = btc.to_numpy()
-        thr, follow = self.params["threshold"], self.params["mode"] == "follow"
+        btc_vals = data.close["BTC/USD"].to_numpy()
 
         position = np.zeros(len(idx))
         holding = False
@@ -58,8 +62,34 @@ class WeekendGap(Strategy):
                 move = btc_vals[i] / btc_at_close - 1
                 holding = move > thr if follow else move < -thr
             position[i] = 1.0 if holding else 0.0
-        w = position / len(self.symbols)
-        return pd.DataFrame({s: w for s in self.symbols}, index=idx)
+        return position
+
+
+class WeekendGapSized(WeekendGap):
+    """Refined weekend gap (from the M4 diagnosis): follow only, and size each stock by its
+    own risk. The bitcoin miners (MARA, RIOT) swing 2-3x more than COIN/MSTR and caused most
+    of the drawdown, so each position aims for `target_vol` daily volatility (from the past
+    30 days, frozen at entry), capped at an equal share of the account."""
+    name = "weekend_gap_sized"
+    default_grid = {"threshold": [0.03, 0.06], "target_vol": [0.02, 0.04]}
+
+    def __init__(self, symbols, threshold: float = 0.03, target_vol: float = 0.02):
+        Strategy.__init__(self, symbols, threshold=threshold, target_vol=target_vol)
+
+    def target_weights(self, data: MarketData) -> pd.DataFrame:
+        position = self._positions(data, self.params["threshold"], follow=True)
+        held = pd.Series(position > 0, index=data.index)
+        entry = held & ~held.shift(1, fill_value=False)
+        cap = 1.0 / len(self.symbols)
+        out = {}
+        for s in self.symbols:
+            c = data.close[s].dropna()
+            daily_vol = np.log(c).diff().rolling("30D").std() * np.sqrt(7)   # 7 regular bars a day
+            daily_vol = daily_vol.where(has_history(c, pd.Timedelta(days=30)))
+            size = (self.params["target_vol"] / daily_vol).clip(upper=1.0) * cap
+            at_entry = size.reindex(data.index).ffill().where(entry).ffill()  # frozen for each trade
+            out[s] = (position * at_entry.fillna(0.0).to_numpy())
+        return pd.DataFrame(out, index=data.index)
 
 
 class FundingContrarian(Strategy):
