@@ -231,6 +231,21 @@ Web app gains live-vs-backtest comparison on top of the views added in M1–M5.
 Strategy evolution ("Darwin"), LLM news analyst, AI trading desk, perps on a futures testnet,
 insider and hype data, more crazy ideas — all through the same funnel.
 
+### M7 progress (2026-10-18/19)
+- **Alternative data collectors** (forward + history where free): DefiLlama stablecoin supply (2017–), Wikipedia
+  attention (2016–), Farside spot BTC ETF flows (2024–), hourly Polymarket top-100 snapshots, Coinbase/Kraken
+  new-pair detection.
+- **Weekly Telegram report** (Sunday 20:00 Vienna) from the Worker.
+- **Data cleaning fix:** only thin-volume spike-and-revert bars are flattened (the old rule wrongly erased the real
+  May 2021 crash and the Jan 2021 DOGE frenzy); Alpaca crypto bars that disagree with Coinbase by > 5% fall back
+  to Coinbase. **Capacity estimates** on report cards (1% of 20-day average daily dollar volume).
+- **combo_sleeves** (weekend gap + SPY regime + crypto trend): rejected — OOS Sharpe 0.84, drawdown −28.8%.
+- **Darwin** (genetic algorithm, 2000 genomes bred on 2016–2017, all counted as trials): in-sample Sharpe 4.20 →
+  out-of-sample 0.89, drawdown −60.6%, deflated Sharpe 0.02 → rejected. The textbook overfitting demonstration.
+- Open: insider clusters & post-earnings drift (need SEC contact email), Hyperliquid testnet perps (need a
+  testnet wallet), LLM news analyst (needs an API key with a spending cap); consider counting *effective*
+  (independent) trials so Darwin's 2000 correlated genomes don't overstate the multiple-testing penalty.
+
 ## Idea backlog
 
 Every idea goes: quick test → full walk-forward → paper → or the graveyard.
