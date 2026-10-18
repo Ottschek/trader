@@ -56,6 +56,9 @@ def annualized_sharpe(r: np.ndarray, bars_per_year: float) -> float:
 def random_entry_test(targets: pd.DataFrame, data: MarketData, cost_bps: dict[str, float],
                       trials: int = 500, seed: int = 0) -> RandomEntryResult:
     """`targets`: the (held) target weights during the out-of-sample windows."""
+    targets = targets.loc[:, (targets != 0).any()]          # assets never held can't contribute: skip them
+    if targets.shape[1] == 0:
+        return RandomEntryResult(0.0, np.zeros(trials), 1.0)
     returns = bar_returns(data).reindex(index=targets.index, columns=targets.columns).fillna(0.0).to_numpy()
     w = targets.to_numpy(dtype=float)
     cost = np.array([cost_bps[s] / 10_000 for s in targets.columns])
