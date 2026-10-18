@@ -62,6 +62,10 @@ costs:
     commission_bps: 25   # Alpaca crypto taker fee, lowest volume tier
     spread_bps: 5
     slippage_bps: 5
+  alpaca_smallcaps:      # daily-bar stock universe (insider clusters, earnings drift): wide spreads
+    commission_bps: 0
+    spread_bps: 40
+    slippage_bps: 10
 
 # Cloud: where the hourly GitHub Actions run keeps its data and reports.
 cloud:

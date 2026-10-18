@@ -121,7 +121,8 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
     if data is None:
         wanted = sorted(set(symbols) | {bench} | set(strategy_cls.signal_symbols))
         data = ho.research_market(v, crypto=[s for s in wanted if is_crypto(s)],
-                                  stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding)
+                                  stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding,
+                                  daily=strategy_cls.bars == "daily")
     if data.index.max() >= pd.Timestamp(v.holdout_start, tz="UTC"):
         raise ho.HoldoutLocked("research data must end before the holdout")
     costs = cost_bps(data, settings)
@@ -215,7 +216,8 @@ def _evaluate_holdout(card, strategy_cls, symbols, wf, settings, v, bench, key, 
     params = wf.best_params(start - train, start)      # final pick, using only pre-holdout data
     wanted = sorted(set(symbols) | {bench} | set(strategy_cls.signal_symbols))
     full = ho.holdout_market(v, crypto=[s for s in wanted if is_crypto(s)],
-                             stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding)
+                             stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding,
+                             daily=strategy_cls.bars == "daily")
     costs = cost_bps(full, settings)
     strat = strategy_cls(symbols, **params)
     res = _slice_result(run_backtest(full, strat.target_weights(full), costs, name=strat.label()), start)

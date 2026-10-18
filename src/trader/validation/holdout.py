@@ -23,11 +23,18 @@ def research_end(v: ValidationSettings) -> pd.Timestamp:
     return pd.Timestamp(v.holdout_start, tz="UTC") - pd.Timedelta(seconds=1)
 
 
+def _load(crypto, stocks, start, end, daily=False, **kwargs) -> MarketData:
+    if daily:   # broad daily-bar stock universe (data/daily.py)
+        from trader.data.daily import load_daily
+        return load_daily(list(stocks) + list(crypto), start=start, end=end)
+    return load_market(crypto=crypto, stocks=stocks, start=start, end=end, **kwargs)
+
+
 def research_market(v: ValidationSettings, crypto=(), stocks=(), **kwargs) -> MarketData:
     """Data for research and walk-forward: everything before the holdout, nothing after."""
     if "end" in kwargs:
         raise HoldoutLocked("research data always ends at the holdout; don't pass `end`")
-    data = load_market(crypto=crypto, stocks=stocks, start=v.research_start, end=research_end(v), **kwargs)
+    data = _load(crypto, stocks, v.research_start, research_end(v), **kwargs)
     assert data.index.max() < pd.Timestamp(v.holdout_start, tz="UTC"), "holdout leaked into research data"
     return data
 
@@ -35,4 +42,4 @@ def research_market(v: ValidationSettings, crypto=(), stocks=(), **kwargs) -> Ma
 def holdout_market(v: ValidationSettings, crypto=(), stocks=(), **kwargs) -> MarketData:
     """Full history including the holdout. Only for the one-time holdout evaluation:
     strategies need the earlier history to warm up their indicators."""
-    return load_market(crypto=crypto, stocks=stocks, start=v.research_start, **kwargs)
+    return _load(crypto, stocks, v.research_start, None, **kwargs)

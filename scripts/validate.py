@@ -17,6 +17,8 @@ import sys
 from trader.config import load_settings
 from trader.strategies.baselines import DipBuyer, RegimeFilter, TsMomentum
 from trader.strategies.examples import RandomEntry, SmaCross
+from trader.strategies.earnings import EarningsDrift
+from trader.strategies.insider import InsiderCluster
 from trader.strategies.ideas import ComboSleeves, FundingContrarian, WeekendGap, WeekendGapSized
 from trader.ledger import sync
 from trader.validation import report_html
@@ -25,7 +27,8 @@ from trader.validation.pipeline import validate
 
 STRATEGIES = {"sma": SmaCross, "random": RandomEntry, "momentum": TsMomentum, "dip": DipBuyer,
               "regime": RegimeFilter, "weekend": WeekendGap, "weekend_sized": WeekendGapSized,
-              "funding": FundingContrarian, "combo": ComboSleeves}
+              "funding": FundingContrarian, "combo": ComboSleeves, "insider": InsiderCluster,
+              "earnings": EarningsDrift}
 
 
 def _value(text: str):
@@ -50,7 +53,7 @@ def parse_grid(items: list[str]) -> dict | None:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("strategy", choices=sorted(STRATEGIES))
-    p.add_argument("--symbols", required=True)
+    p.add_argument("--symbols", help="comma-separated; omit for strategies with their own universe (insider)")
     p.add_argument("-g", "--grid", action="append", default=[], help="parameter values to try, e.g. fast=24,72")
     p.add_argument("--benchmark")
     p.add_argument("--train-months", type=int, help="override walk-forward training window (recorded)")
@@ -60,15 +63,19 @@ def main() -> int:
     args = p.parse_args()
 
     cls = STRATEGIES[args.strategy]
+    symbols = args.symbols.split(",") if args.symbols else cls.default_universe()
+    if not symbols:
+        p.error(f"--symbols is required for {args.strategy}")
     try:
-        card = validate(cls, args.symbols.split(","), load_settings(), grid=parse_grid(args.grid),
+        card = validate(cls, symbols, load_settings(), grid=parse_grid(args.grid),
                         benchmark=args.benchmark, holdout=args.holdout, record=not args.no_record,
                         train_months=args.train_months, test_months=args.test_months)
     except HoldoutLocked as e:
         print(f"✗ Holdout refused: {e}")
         return 3
 
-    print(f"{card.strategy} on {', '.join(card.symbols)}: {card.verdict.upper()}")
+    shown = ", ".join(card.symbols) if len(card.symbols) <= 12 else f"{len(card.symbols)} symbols"
+    print(f"{card.strategy} on {shown}: {card.verdict.upper()}")
     for g in card.gates:
         print(f"  {'✓' if g.passed else '✗'} {g.label:22} {g.value:>24}   needs {g.threshold}")
     if card.holdout:

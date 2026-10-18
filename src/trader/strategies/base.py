@@ -21,10 +21,16 @@ class Strategy:
     default_grid: dict[str, list] = {}   # parameter values the validation walk-forward tries
     signal_symbols: list[str] = []       # extra symbols it reads but never trades (e.g. BTC for crypto stocks)
     needs_funding = False                # needs Hyperliquid funding rates in the data
+    bars = "hourly"                      # "daily" -> validated on the broad daily-bar stock universe
 
     def __init__(self, symbols, **params):
         self.symbols = list(symbols)
         self.params = params
+
+    @classmethod
+    def default_universe(cls) -> list[str] | None:
+        """Symbols to validate on when none are given (broad-universe strategies override this)."""
+        return None
 
     def target_weights(self, data: MarketData) -> pd.DataFrame:
         raise NotImplementedError
