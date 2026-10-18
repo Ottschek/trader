@@ -91,7 +91,7 @@ function Ledger({ experiments }) {
               <tr>
                 <th>Date</th><th>Idea</th><th>Verdict</th><th>Gates</th>
                 <th className="num">OOS Sharpe</th><th className="num">vs hold</th>
-                <th className="num">Max DD</th><th className="num">Trials</th><th>Report</th>
+                <th className="num">Max DD</th><th className="num">Trials (eff.)</th><th>Report</th>
               </tr>
             </thead>
             <tbody>
@@ -115,7 +115,7 @@ function Ledger({ experiments }) {
                     <td className="num">{num(e.oos_sharpe)}</td>
                     <td className="num">{num(e.bench_sharpe)}</td>
                     <td className="num">{pct(e.oos_max_drawdown)}</td>
-                    <td className="num">{e.trials}</td>
+                    <td className="num">{e.trials}{e.effective_trials != null && e.effective_trials !== e.trials ? ` (${e.effective_trials.toFixed(1)})` : ""}</td>
                     <td>
                       {e.has_report
                         ? <a href={`/reports/${e.id}`} target="_blank" rel="noopener">Open ↗</a>
@@ -140,12 +140,14 @@ function Lab({ data }) {
   const ex = data.experiments;
   const ideas = new Set(ex.map((e) => e.idea)).size;
   const trials = ex.reduce((s, e) => s + e.trials, 0);
+  const effective = ex.reduce((s, e) => s + (e.effective_trials ?? e.trials), 0);
   const alive = ex.filter((e) => ALIVE.has(e.verdict)).length;
   return (
     <>
       <div className="tiles">
         <Tile label="Ideas tested" value={ideas} sub={`${ex.length} validation run${ex.length === 1 ? "" : "s"}`} />
-        <Tile label="Trials counted" value={trials} sub="every one raises the bar" />
+        <Tile label="Effective trials" value={Math.round(effective)}
+              sub={`${trials.toLocaleString("en")} raw; correlated variants count less`} />
         <Tile label="Candidates" value={alive} sub={alive ? "passed every research gate" : "none yet"}
               status={alive ? "ok" : null} />
         <Tile label="Graveyard" value={ex.length - alive} sub="rejected ideas, kept on record" />

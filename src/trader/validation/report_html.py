@@ -206,8 +206,9 @@ walk-forward {card.train_years * 12:.0f}-month train / {card.test_months}-month 
 <section class="card"><h2>Random-timing test</h2><p class="muted">The strategy's in-market periods shuffled
 {card.random_entry["trials"]} times. p = {card.random_entry["p_value"]:.3f}: share of shuffles that did at least as well.</p>
 {_random_svg(card.random_sharpes, card.random_entry["strategy_sharpe"])}</section>
-<section class="card"><h2>Walk-forward folds</h2><p class="muted">{card.trials} parameter sets tried this run ·
-{card.total_trials} trials in the ledger in total · deflated Sharpe {card.deflated["probability"]:.2f}</p>
+<section class="card"><h2>Walk-forward folds</h2><p class="muted">{card.trials} parameter sets tried this run
+({getattr(card, "effective_trials", card.trials):.1f} effective) · {card.total_trials} trials in the ledger
+({getattr(card, "total_effective_trials", card.total_trials):.0f} effective) · deflated Sharpe {card.deflated["probability"]:.2f}</p>
 <div class="tw"><table><thead><tr><th>Test window</th><th>Parameters picked on the prior {card.train_years * 12:.0f} months</th><th class="num">Return</th></tr></thead>
 <tbody>{folds}</tbody></table></div></section>
 {holdout}

@@ -60,3 +60,24 @@ def deflated_sharpe(returns: pd.Series, trials: int, trial_sharpes: list[float] 
         var = (1 + 0.5 * sr ** 2) / max(bars, 1)
     sr_star = expected_max_sharpe(trials, var)
     return DeflatedSharpe(probabilistic_sharpe(sr, sr_star, bars, skew, kurt), sr, sr_star, trials, bars)
+
+
+def average_correlation(return_series: list[pd.Series]) -> float | None:
+    """Mean pairwise correlation of daily returns of a batch of strategies (None if < 2)."""
+    if len(return_series) < 2:
+        return None
+    daily = pd.concat([r.resample("1D").sum() for r in return_series], axis=1).fillna(0.0)
+    daily = daily.loc[:, daily.std() > 0]
+    if daily.shape[1] < 2:
+        return 1.0                       # all flat or identical: no independent information
+    c = daily.corr().to_numpy()
+    off = c[~np.eye(len(c), dtype=bool)]
+    return float(np.clip(np.nanmean(off), 0.0, 1.0))
+
+
+def effective_trials(n: int, rho: float | None) -> float:
+    """Effective number of independent trials for a batch of n correlated ones:
+    N_eff = rho + (1 - rho) * n (Bailey & Lopez de Prado). Unknown correlation -> n."""
+    if rho is None or n <= 1:
+        return float(n)
+    return rho + (1.0 - rho) * n

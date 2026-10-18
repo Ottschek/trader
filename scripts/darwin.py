@@ -70,7 +70,7 @@ def fitness(g: dict, data, returns: np.ndarray, cost: np.ndarray, bpy: float) ->
     return annualized_sharpe(approx_returns(w, returns, cost), bpy)
 
 
-def evolve(seed: int = 0) -> dict:
+def evolve(seed: int = 0, write: bool = True, history: list | None = None) -> dict:
     s = load_settings()
     data = load_market(crypto=SYMBOLS, start=EVOLVE_START, end=EVOLVE_END)
     returns = bar_returns(data)[SYMBOLS].to_numpy()
@@ -83,6 +83,8 @@ def evolve(seed: int = 0) -> dict:
     for gen in range(GENERATIONS):
         scored = sorted(((fitness(g, data, returns, cost, bpy), g) for g in pop), key=lambda x: -x[0])
         evaluated += len(pop)
+        if history is not None:
+            history.extend(pop)
         print(f"generation {gen + 1:2}/{GENERATIONS}: best in-sample Sharpe {scored[0][0]:.2f}, median {scored[len(scored) // 2][0]:.2f}")
         elite = [g for _, g in scored[:ELITE]]
 
@@ -93,9 +95,30 @@ def evolve(seed: int = 0) -> dict:
     survivors = [{"genes": g, "in_sample_sharpe": round(f, 3)} for f, g in scored[:SURVIVORS]]
     result = {"evolved_on": [EVOLVE_START, EVOLVE_END], "symbols": SYMBOLS, "seed": seed,
               "evaluated": evaluated, "survivors": survivors}
-    POPULATION.write_text(json.dumps(result, indent=1))
-    print(f"{evaluated} genomes evaluated; top {SURVIVORS} written to {POPULATION}")
+    if write:
+        POPULATION.write_text(json.dumps(result, indent=1))
+        print(f"{evaluated} genomes evaluated; top {SURVIVORS} written to {POPULATION}")
     return result
+
+
+def search_correlation(seed: int = 0, sample: int = 100) -> float:
+    """Average return correlation among genomes the search actually evaluated (a random sample
+    of all of them, not just the converged survivors), over the research period. Re-runs the
+    deterministic evolution; measurement only."""
+    from trader.backtest.engine import run_backtest
+    from trader.backtest.runner import cost_bps
+    from trader.validation.deflated import average_correlation
+    from trader.validation.holdout import research_market
+
+    history: list[dict] = []
+    evolve(seed, write=False, history=history)
+    rng = np.random.default_rng(seed + 1)
+    picks = [history[i] for i in rng.choice(len(history), size=min(sample, len(history)), replace=False)]
+    s = load_settings()
+    data = research_market(s.validation, crypto=SYMBOLS)
+    costs = cost_bps(data, s)
+    returns = [run_backtest(data, EvolvedRule(SYMBOLS, genes=g).target_weights(data), costs).returns for g in picks]
+    return average_correlation(returns)
 
 
 def validate_survivors() -> int:
@@ -103,8 +126,9 @@ def validate_survivors() -> int:
 
     pop = json.loads(POPULATION.read_text())
     n = len(pop["survivors"])
+    rho = search_correlation(pop["seed"])
     card = validate(EvolvedRule, pop["symbols"], load_settings(), grid={"genome": list(range(n))},
-                    extra_trials=pop["evaluated"] - n)
+                    extra_trials=pop["evaluated"] - n, batch_correlation=rho)
     print(f"darwin_evolved: {card.verdict.upper()} · trials counted: {card.trials} · ledger total {card.total_trials}")
     for g in card.gates:
         print(f"  {'✓' if g.passed else '✗'} {g.label:22} {g.value:>26}   needs {g.threshold}")

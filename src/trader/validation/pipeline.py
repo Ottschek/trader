@@ -28,7 +28,7 @@ from trader.config import Settings, ValidationSettings
 from trader.ledger import ledger
 from trader.strategies.examples import BuyAndHold
 from trader.validation import holdout as ho
-from trader.validation.deflated import deflated_sharpe
+from trader.validation.deflated import average_correlation, deflated_sharpe, effective_trials
 from trader.validation.montecarlo import random_entry_test
 from trader.validation.walkforward import param_combos, walk_forward
 
@@ -59,6 +59,9 @@ class ReportCard:
     grid: dict
     trials: int
     total_trials: int
+    effective_trials: float
+    total_effective_trials: float
+    avg_correlation: float | None
     code: dict
     research_window: list[str]
     train_years: float
@@ -107,11 +110,14 @@ def _slice_result(r: BacktestResult, start) -> BacktestResult:
 def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None, data: MarketData | None = None,
              benchmark: str | None = None, holdout: bool = False, record: bool = True, seed: int = 0,
              validation: ValidationSettings | None = None, train_months: int | None = None,
-             test_months: int | None = None, extra_trials: int = 0) -> ReportCard:
+             test_months: int | None = None, extra_trials: int = 0,
+             batch_correlation: float | None = None) -> ReportCard:
     """`train_months`/`test_months` override the walk-forward windows for ideas whose data is
     too short for the defaults (e.g. funding history starts 2023). The override is recorded.
     `extra_trials`: candidates tried before this run that aren't in the grid (e.g. every genome
-    Darwin evaluated); they count toward the deflated Sharpe like any other trial."""
+    Darwin evaluated); they count toward the deflated Sharpe like any other trial.
+    `batch_correlation`: measured correlation of the whole batch (e.g. a sample of every genome
+    Darwin evaluated); otherwise it's measured on the grid's own parameter sets."""
     v = validation or settings.validation
     if train_months or test_months:
         v = replace(v, train_years=(train_months or v.train_years * 12) / 12, test_months=test_months or v.test_months)
@@ -129,6 +135,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
     combos = param_combos(grid)
     key = ledger.idea_key(strategy_cls.name, symbols)
     prior_trials, prior_sharpes = ledger.total_trials(), ledger.trial_sharpes()
+    prior_effective = ledger.total_effective_trials()
 
     # 1. honesty, for every parameter set
     problems = []
@@ -147,9 +154,12 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
     # 5. random entry, on the out-of-sample record
     rnd = random_entry_test(wf.oos_targets, data, costs, trials=v.random_trials, seed=seed)
 
-    # 6. deflated Sharpe, counting every trial ever run
+    # 6. deflated Sharpe, counting every trial ever run (as independent trials: correlated
+    #    variants of one idea count less, N_eff = rho + (1 - rho) * N)
     trials = len(wf.combos) + extra_trials
-    dsr = deflated_sharpe(wf.oos.returns, prior_trials + trials, prior_sharpes + wf.combo_sharpes)
+    rho = batch_correlation if batch_correlation is not None else average_correlation([r.returns for r in wf.combo_results])
+    eff = effective_trials(trials, rho)
+    dsr = deflated_sharpe(wf.oos.returns, max(1, round(prior_effective + eff)), prior_sharpes + wf.combo_sharpes)
 
     gates = [
         Gate("honest", "No lookahead", not problems, f"{len(problems)} problems", "0 problems"),
@@ -162,7 +172,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
         Gate("random_entry", "Beats random timing", rnd.p_value <= v.max_p_value,
              f"p = {rnd.p_value:.3f}", f"<= {v.max_p_value:.2f}"),
         Gate("deflated", "Deflated Sharpe", dsr.probability >= v.min_deflated_sharpe,
-             f"{dsr.probability:.2f} ({dsr.trials} trials)", f">= {v.min_deflated_sharpe:.2f}"),
+             f"{dsr.probability:.2f} ({dsr.trials} eff. trials)", f">= {v.min_deflated_sharpe:.2f}"),
     ]
     # capacity of the parameter set the walk-forward picked most often
     picks = [json.dumps(c, sort_keys=True) for c in wf.chosen]
@@ -175,7 +185,9 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
         id=uuid.uuid4().hex[:12],
         created_at=pd.Timestamp.now(tz="UTC").isoformat(),
         idea=key, strategy=strategy_cls.name, symbols=symbols, benchmark=bench, grid=grid,
-        trials=trials, total_trials=prior_trials + trials, code=code,
+        trials=trials, total_trials=prior_trials + trials, effective_trials=round(eff, 2),
+        total_effective_trials=round(prior_effective + eff, 2),
+        avg_correlation=round(rho, 4) if rho is not None else None, code=code,
         research_window=[data.index[0].isoformat(), data.index[-1].isoformat()],
         train_years=v.train_years, test_months=v.test_months,
         gates=gates, verdict="candidate" if all(g.passed for g in gates) else "rejected",

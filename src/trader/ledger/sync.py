@@ -16,7 +16,7 @@ REPORT_PREFIX = "reports/"   # R2 key prefix; never pulled into data/ by the col
 COLUMNS = ["id", "created_at", "idea", "strategy", "symbols", "benchmark", "verdict", "trials",
            "total_trials", "commit_sha", "dirty", "research_start", "research_end", "oos_sharpe",
            "oos_cagr", "oos_max_drawdown", "bench_sharpe", "p_value", "deflated", "gates", "grid",
-           "folds", "holdout", "has_report"]
+           "folds", "holdout", "has_report", "effective_trials"]
 
 
 def _gates(gates: list[dict]) -> list[dict]:
@@ -35,6 +35,7 @@ def to_row(e: dict, has_report: bool = False) -> tuple:
         e.get("random_entry", {}).get("p_value"), e.get("deflated", {}).get("probability"),
         json.dumps(_gates(e["gates"])), json.dumps(e["grid"]), json.dumps(e.get("folds", [])),
         json.dumps(e["holdout"]) if e.get("holdout") else None, int(has_report),
+        float(e.get("effective_trials", e["trials"])),
     )
 
 

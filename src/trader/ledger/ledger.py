@@ -53,7 +53,13 @@ def append(entry: dict) -> None:
 
 
 def total_trials() -> int:
+    """Raw count of every strategy ever tried."""
     return sum(int(e.get("trials", 0)) for e in entries())
+
+
+def total_effective_trials() -> float:
+    """Independent trials: each batch counts N_eff = rho + (1 - rho) * N (falls back to the raw count)."""
+    return sum(float(e.get("effective_trials", e.get("trials", 0))) for e in entries())
 
 
 def trial_sharpes() -> list[float]:

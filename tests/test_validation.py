@@ -184,3 +184,26 @@ def test_extra_trials_count_toward_the_ledger(settings):
     card = validate(RandomEntry, ["TEST/USD"], settings, grid={"seed": [1], "p_enter": [0.02], "hold": [24]},
                     benchmark="TEST/USD", extra_trials=99)
     assert card.trials == 100 and ledger.total_trials() == 100
+
+
+def test_effective_trials_shrink_for_correlated_batches():
+    from trader.validation.deflated import average_correlation, effective_trials
+    idx = pd.date_range("2024-01-01", periods=24 * 200, freq="h", tz="UTC")
+    rng = np.random.default_rng(3)
+    base = pd.Series(rng.normal(0, 0.01, len(idx)), index=idx)
+    clones = [base + pd.Series(rng.normal(0, 0.001, len(idx)), index=idx) for _ in range(5)]
+    independent = [pd.Series(rng.normal(0, 0.01, len(idx)), index=idx) for _ in range(5)]
+    rho_c, rho_i = average_correlation(clones), average_correlation(independent)
+    assert rho_c > 0.95 and rho_i < 0.1
+    assert effective_trials(2000, rho_c) < 120                 # near-copies count as few trials
+    assert effective_trials(5, rho_i) > 4.5                    # unrelated ideas count fully
+    assert effective_trials(7, None) == 7.0
+
+
+def test_deflated_gate_uses_effective_totals(settings):
+    random_walk()
+    card = validate(RandomEntry, ["TEST/USD"], settings, grid={"seed": [1, 2, 3], "p_enter": [0.02], "hold": [24]},
+                    benchmark="TEST/USD")
+    assert card.effective_trials <= card.trials
+    assert ledger.total_effective_trials() == pytest.approx(card.effective_trials, abs=0.01)
+    assert "eff. trials" in card.gates[-1].value
