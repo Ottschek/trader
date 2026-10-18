@@ -1,7 +1,7 @@
 // Run: npm test (in cloudflare/scheduler)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatSummary, isoUtc, jobsAt, parseTs, snapshotRows, summaryDue, watchdogAction } from "../src/index.js";
+import { formatSummary, formatWeekly, isoUtc, jobsAt, parseTs, snapshotRows, summaryDue, watchdogAction, weeklyDue } from "../src/index.js";
 
 const env = { TIMEZONE: "Europe/Vienna", SUMMARY_TIMES: "08:00,22:30" };
 const at = (iso) => new Date(iso);
@@ -58,4 +58,28 @@ test("one trigger: :00 runs snapshot + watchdog, summaries only at their times",
   assert.deepEqual(jobsAt(at("2026-07-01T13:30:00Z"), env), []);
   assert.deepEqual(jobsAt(at("2026-07-01T06:00:00Z"), env), ["snapshot", "watchdog", "summary"]); // 08:00 Vienna
   assert.deepEqual(jobsAt(at("2026-07-01T20:30:00Z"), env), ["summary"]);                         // 22:30 Vienna
+});
+
+test("weekly report fires Sunday 20:00 Vienna only", () => {
+  const w = { ...env, WEEKLY_REPORT: "Sun 20:00" };
+  assert.equal(weeklyDue(at("2026-10-25T19:00:00Z"), w), true);    // Sun 20:00 CET (after DST ends)
+  assert.equal(weeklyDue(at("2026-10-18T18:00:00Z"), w), true);    // Sun 20:00 CEST
+  assert.equal(weeklyDue(at("2026-10-19T18:00:00Z"), w), false);   // Monday
+  assert.deepEqual(jobsAt(at("2026-10-18T18:00:00Z"), w), ["snapshot", "watchdog", "weekly"]);
+});
+
+test("weekly report text", () => {
+  const text = formatWeekly({
+    now: at("2026-10-25T19:00:00Z"), timeZone: "Europe/Vienna", equityNow: 101_200, equityWeekAgo: 100_000,
+    decisions: [{ kind: "entry" }, { kind: "no_trade" }], openTrade: null, halted: null,
+    recon: { tracking_difference: 0.001, mismatches: [], avg_slippage_bps: 5.5 },
+    runs: [{ status: "ok" }, { status: "fail" }], failingNow: [], oiCount: 1675,
+    experiments: [{ verdict: "rejected" }], totalTrials: 29, dashboard: "https://example.pages.dev",
+  });
+  assert.match(text, /Equity 101,200 USD \(\+1\.20% this week\)/);
+  assert.match(text, /1 entry, 1 no-trade/);
+  assert.match(text, /tracking \+0\.10%, 0 decision mismatch/);
+  assert.match(text, /Collector runs: 2 \(1 with failures\)/);
+  assert.match(text, /All checks pass now/);
+  assert.match(text, /29 trials in the ledger/);
 });

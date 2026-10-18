@@ -13,6 +13,71 @@ export function summaryDue(date, env) {
   return env.SUMMARY_TIMES.split(",").includes(localTime(date, env.TIMEZONE));
 }
 
+/** WEEKLY_REPORT like "Sun 20:00" in TIMEZONE. */
+export function weeklyDue(date, env) {
+  if (!env.WEEKLY_REPORT) return false;
+  const [day, time] = env.WEEKLY_REPORT.split(" ");
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: env.TIMEZONE, weekday: "short" }).format(date);
+  return weekday === day && localTime(date, env.TIMEZONE) === time;
+}
+
+const fmtPct = (x, d = 2) => (x == null ? "n/a" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(d)}%`);
+
+export function formatWeekly({ now, timeZone, equityNow, equityWeekAgo, decisions, openTrade, halted, recon,
+                               runs, failingNow, oiCount, experiments, totalTrials, dashboard }) {
+  const local = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "short", year: "numeric" }).format(now);
+  const lines = [`🗓 <b>Weekly report</b> · week ending ${local}`, "", "🧪 <b>Shadow paper experiment</b> (not a validated candidate)"];
+  if (equityNow != null) {
+    lines.push(`Equity ${Math.round(equityNow).toLocaleString("en")} USD` +
+               (equityWeekAgo ? ` (${fmtPct(equityNow / equityWeekAgo - 1)} this week)` : ""));
+  }
+  const trades = decisions.filter((d) => d.kind === "entry").length;
+  const noTrades = decisions.filter((d) => d.kind === "no_trade").length;
+  lines.push(`Decisions this week: ${trades} entr${trades === 1 ? "y" : "ies"}, ${noTrades} no-trade` +
+             (decisions.some((d) => d.kind === "skipped") ? ", some skipped ⚠️" : ""));
+  lines.push(`Open trade: ${openTrade ? `since ${openTrade.session_date}` : "none"} · Trading: ${halted ? `halted (${escapeHtml(halted.reason)})` : "active"}`);
+  if (recon) {
+    lines.push(`Live vs backtest: tracking ${fmtPct(recon.tracking_difference)}, ${recon.mismatches.length} decision mismatch(es)` +
+               (recon.avg_slippage_bps != null ? `, avg fill vs open ${recon.avg_slippage_bps} bps` : ""));
+  }
+  lines.push("", "📡 <b>Data</b>");
+  const failedRuns = runs.filter((r) => r.status === "fail").length;
+  lines.push(`Collector runs: ${runs.length} (${failedRuns} with failures) · open interest snapshots: ${oiCount}/1680`);
+  lines.push(failingNow.length ? `Failing now: ${failingNow.slice(0, 5).map((f) => escapeHtml(f.dataset)).join(", ")}` : "All checks pass now ✅");
+  lines.push("", "🔬 <b>Research</b>");
+  const candidates = experiments.filter((e) => e.verdict === "candidate" || e.verdict === "holdout_passed").length;
+  lines.push(`${experiments.length} validation run(s) this week · ${candidates} candidate(s) · ${totalTrials} trials in the ledger`);
+  lines.push("", dashboard);
+  return lines.join("\n");
+}
+
+async function sendWeekly(env, now) {
+  const weekAgo = isoUtc(new Date(now.getTime() - 7 * 24 * HOUR));
+  const [eqNow, eqThen, decisions, state, recon, runs, latest, oi, experiments, trials] = await env.DB.batch([
+    env.DB.prepare("SELECT equity FROM paper_equity ORDER BY ts DESC LIMIT 1"),
+    env.DB.prepare("SELECT equity FROM paper_equity WHERE ts <= ? ORDER BY ts DESC LIMIT 1").bind(weekAgo),
+    env.DB.prepare("SELECT kind FROM paper_decisions WHERE decided_at >= ?").bind(weekAgo),
+    env.DB.prepare("SELECT key, value FROM paper_state"),
+    env.DB.prepare("SELECT summary FROM paper_reconcile ORDER BY computed_at DESC LIMIT 1"),
+    env.DB.prepare("SELECT status FROM collector_runs WHERE run_at >= ?").bind(weekAgo),
+    env.DB.prepare("SELECT run_at FROM collector_runs ORDER BY run_at DESC LIMIT 1"),
+    env.DB.prepare("SELECT count(*) AS n FROM oi_snapshots WHERE ts >= ?").bind(weekAgo),
+    env.DB.prepare("SELECT verdict FROM experiments WHERE created_at >= ?").bind(weekAgo),
+    env.DB.prepare("SELECT coalesce(sum(trials), 0) AS n FROM experiments"),
+  ]);
+  const st = Object.fromEntries(state.results.map((r) => [r.key, JSON.parse(r.value)]));
+  const lastRun = latest.results[0]?.run_at;
+  const failingNow = lastRun
+    ? (await env.DB.prepare("SELECT dataset FROM check_results WHERE run_at = ? AND status = 'fail'").bind(lastRun).all()).results
+    : [];
+  await telegram(env, formatWeekly({
+    now, timeZone: env.TIMEZONE, equityNow: eqNow.results[0]?.equity ?? null, equityWeekAgo: eqThen.results[0]?.equity ?? null,
+    decisions: decisions.results, openTrade: st.open_trade ?? null, halted: st.halted ?? null,
+    recon: recon.results[0] ? JSON.parse(recon.results[0].summary) : null, runs: runs.results, failingNow,
+    oiCount: oi.results[0].n, experiments: experiments.results, totalTrials: trials.results[0].n, dashboard: env.DASHBOARD_URL,
+  }));
+}
+
 const telegram = (env, text) => sendTelegram(env, fetch, text);
 
 // --- open interest snapshot ------------------------------------------------------
@@ -133,6 +198,7 @@ export function jobsAt(now, env) {
   const jobs = [];
   if (now.getUTCMinutes() < 30) jobs.push("snapshot", "watchdog");
   if (summaryDue(now, env)) jobs.push("summary");
+  if (weeklyDue(now, env)) jobs.push("weekly");
   return jobs;
 }
 
@@ -155,6 +221,7 @@ async function run(now, env) {
     snapshot: ["open interest snapshot", () => recordSnapshot(env, now)],
     watchdog: ["watchdog", () => watchdog(env, now)],
     summary: ["daily summary", () => sendSummary(env, now)],
+    weekly: ["weekly report", () => sendWeekly(env, now)],
     paper_orders: ["paper: order updates", () => refreshOrders(paperContext(env, now))],
     paper_morning: ["paper: 09:00 decision", () => morning(paperContext(env, now))],
     paper_risk: ["paper: risk check", async () => {
