@@ -136,9 +136,22 @@ Hourly GitHub Actions collector writes to R2, records Hyperliquid open interest,
 Web app v1: data health page.
 ✅ Done when the database fills itself every hour, all checks pass, and the data health page shows it.
 
-### M2 — Backtester
+### M2 — Backtester ✅ (built 2026-10-18)
 Next-bar fills, per-venue fees and spread, metrics: return, Sharpe, max drawdown, turnover, always next to buy-and-hold.
 ✅ Done when a deliberately cheating strategy gets caught, and a simple strategy matches hand-calculated results.
+
+How it works (`src/trader/backtest/`):
+- **Timing:** a strategy decides target weights after bar *t* closes; trades fill at the asset's next bar *open*.
+  Returns are split into gap (close→open, earned by the old position) and intra (open→close, earned by the new one).
+  A stock target set while the market is closed fills at the next session's first bar.
+- **Costs** per trade = commission + half the spread + slippage (crypto 32.5 bps, stocks 4 bps one way).
+- **Stocks:** regular-session bars by default; splits and dividends applied *forward* in the gap return of the
+  first bar on/after the ex-date, so no future corporate action leaks into earlier prices.
+- **Crypto:** signals from Coinbase; fills use Alpaca returns where Alpaca has consecutive bars, else Coinbase.
+- **Bad ticks** (spike-and-revert) are flattened before backtesting, so dip-buying strategies can't profit from them.
+- **Lookahead check:** every strategy is re-run on history truncated at 12 points; if any past decision changes
+  when later data is added, the result is flagged invalid (catches shift(-1) cheats and full-sample statistics).
+- Run: `.venv/bin/python scripts/run_backtest.py sma --symbols BTC/USD -p fast=72 -p slow=480`
 
 ### M3 — Validation harness + ledger
 Walk-forward, holdout locked in code, Monte Carlo, deflated Sharpe, standard report card, every run logged.

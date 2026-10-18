@@ -32,7 +32,7 @@ def test_risk_limits_match_plan():
 def test_costs_are_never_zero():
     # A backtest without costs lies. Every venue must charge something.
     for venue, c in load_settings().costs.items():
-        assert c.total_bps > 0, venue
+        assert c.one_way_bps > 0, venue
 
 
 def test_bad_risk_limit_rejected(tmp_path):

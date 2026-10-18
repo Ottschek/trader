@@ -31,9 +31,10 @@ class VenueCosts:
     slippage_bps: float
 
     @property
-    def total_bps(self) -> float:
-        """Cost of one trade (one side), in basis points."""
-        return self.commission_bps + self.spread_bps + self.slippage_bps
+    def one_way_bps(self) -> float:
+        """Cost of one buy or one sell, in basis points: commission, half the bid-ask
+        spread (we cross from the mid to the far side) and slippage."""
+        return self.commission_bps + self.spread_bps / 2 + self.slippage_bps
 
 
 @dataclass(frozen=True)
