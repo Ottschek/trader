@@ -81,11 +81,13 @@ GitHub token for triggering jobs. Each lives in local `.env`, GitHub Secrets, an
 
 ## Web app
 
-A private dashboard + full control panel, grown milestone by milestone.
+A public, read-only dashboard at https://trader-web-6t6.pages.dev, grown milestone by milestone.
 
 - **Stack:** React (Vite) + TradingView Lightweight Charts, hosted on **Cloudflare Pages** (free `*.pages.dev` address).
   Clean light design, responsive for phone and desktop.
-- **Login:** Cloudflare Access with **GitHub login**; only `Ottschek` is allowed in.
+- **Login:** none (decided 2026-10-18). Anyone with the link can view; every request that changes something
+  is refused. **Open for M5:** the control panel and kill switch cannot be public, so protecting them
+  (Cloudflare Access, a password, or Telegram-only controls) gets decided when they are built.
 - **Data:** after each hourly run the bot writes summaries (equity, trades, positions, data checks, report cards)
   to **Cloudflare D1**. Balances and positions are read **live** from Alpaca, so paper keys are also stored in Cloudflare.
   Alpaca has no read-only keys, so the server code only uses them for reads and the kill switch.

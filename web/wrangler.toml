@@ -9,6 +9,7 @@ database_name = "trader"
 database_id = "a4287e14-2892-4a4f-9953-a6bab17c2716"
 
 [vars]
-# Filled in after Cloudflare Access is set up. Until then every /api request is refused.
+# Optional login. Empty = public read-only site: GET requests are answered, anything that
+# changes something is refused. Set both to require a Cloudflare Access login for changes.
 ACCESS_TEAM_DOMAIN = ""   # e.g. "yourteam.cloudflareaccess.com"
 ACCESS_AUD = ""           # the Access application's "Application Audience (AUD) Tag"
