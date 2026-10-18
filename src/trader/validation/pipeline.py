@@ -13,7 +13,7 @@ Only a strategy that passes all six may look at the locked holdout, once, with c
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 
 import pandas as pd
 
@@ -59,6 +59,8 @@ class ReportCard:
     total_trials: int
     code: dict
     research_window: list[str]
+    train_years: float
+    test_months: int
     gates: list[Gate]
     verdict: str                      # rejected | candidate | holdout_passed | holdout_failed
     oos: dict = field(default_factory=dict)
@@ -101,15 +103,20 @@ def _slice_result(r: BacktestResult, start) -> BacktestResult:
 
 def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None, data: MarketData | None = None,
              benchmark: str | None = None, holdout: bool = False, record: bool = True, seed: int = 0,
-             validation: ValidationSettings | None = None) -> ReportCard:
+             validation: ValidationSettings | None = None, train_months: int | None = None,
+             test_months: int | None = None) -> ReportCard:
+    """`train_months`/`test_months` override the walk-forward windows for ideas whose data is
+    too short for the defaults (e.g. funding history starts 2023). The override is recorded."""
     v = validation or settings.validation
+    if train_months or test_months:
+        v = replace(v, train_years=(train_months or v.train_years * 12) / 12, test_months=test_months or v.test_months)
     grid = grid or strategy_cls.default_grid
     symbols = list(symbols)
     bench = benchmark or benchmark_symbol(strategy_cls(symbols, **param_combos(grid)[0]), settings)
     if data is None:
-        wanted = sorted(set(symbols) | {bench})
+        wanted = sorted(set(symbols) | {bench} | set(strategy_cls.signal_symbols))
         data = ho.research_market(v, crypto=[s for s in wanted if is_crypto(s)],
-                                  stocks=[s for s in wanted if not is_crypto(s)])
+                                  stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding)
     if data.index.max() >= pd.Timestamp(v.holdout_start, tz="UTC"):
         raise ho.HoldoutLocked("research data must end before the holdout")
     costs = cost_bps(data, settings)
@@ -158,6 +165,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
         idea=key, strategy=strategy_cls.name, symbols=symbols, benchmark=bench, grid=grid,
         trials=trials, total_trials=prior_trials + trials, code=code,
         research_window=[data.index[0].isoformat(), data.index[-1].isoformat()],
+        train_years=v.train_years, test_months=v.test_months,
         gates=gates, verdict="candidate" if all(g.passed for g in gates) else "rejected",
         oos=_metrics(oos), benchmark_oos=_metrics(boos),
         folds=[{"test_start": f.test_start.isoformat(), "test_end": f.test_end.isoformat(),
@@ -194,9 +202,9 @@ def _evaluate_holdout(card, strategy_cls, symbols, wf, settings, v, bench, key, 
     start = pd.Timestamp(v.holdout_start, tz="UTC")
     train = pd.DateOffset(months=int(round(v.train_years * 12)))
     params = wf.best_params(start - train, start)      # final pick, using only pre-holdout data
-    wanted = sorted(set(symbols) | {bench})
+    wanted = sorted(set(symbols) | {bench} | set(strategy_cls.signal_symbols))
     full = ho.holdout_market(v, crypto=[s for s in wanted if is_crypto(s)],
-                             stocks=[s for s in wanted if not is_crypto(s)])
+                             stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding)
     costs = cost_bps(full, settings)
     strat = strategy_cls(symbols, **params)
     res = _slice_result(run_backtest(full, strat.target_weights(full), costs, name=strat.label()), start)

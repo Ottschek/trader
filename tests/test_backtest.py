@@ -216,3 +216,20 @@ def test_max_drawdown_and_flat_sharpe():
     assert hold["max_drawdown"] == pytest.approx(-0.5)        # 120 -> 60
     flat = summarize(run_backtest(data, pd.DataFrame({"TEST/USD": 0.0}, index=data.index), {"TEST/USD": 0.0}))
     assert flat["sharpe"] == 0.0 and flat["total_return"] == 0.0
+
+
+def test_mixed_timing_never_fills_before_the_decision_bar_closed():
+    # crypto bars start on the hour, regular-session stock bars at :30
+    ts = stock_hours(1)                                   # 09:30 ... 15:30 New York
+    write_bars("alpaca_stocks", "STK", ts, [100.0] * 7, [100.0] * 7, session="regular")
+    crypto_ts = pd.date_range(ts[0].floor("h"), ts[-1].ceil("h"), freq="h")
+    write_bars("coinbase", "C/USD", crypto_ts, [1.0] * len(crypto_ts), [1.0] * len(crypto_ts))
+    data = load_market(crypto=["C/USD"], stocks=["STK"])
+
+    decide = crypto_ts[1]                                 # crypto bar 10:00-11:00 NY: its close is known at 11:00
+    targets = pd.DataFrame({"STK": 0.0, "C/USD": 0.0}, index=data.index)
+    targets.loc[decide:, "STK"] = 1.0
+    r = run_backtest(data, targets, {"STK": 0.0, "C/USD": 0.0})
+    filled = r.turnover[r.turnover > 0].index[0]
+    assert filled >= decide + pd.Timedelta(hours=1)       # not at the 10:30 stock open
+    assert filled == ts[2]                                # but at 11:30, the first open after 11:00

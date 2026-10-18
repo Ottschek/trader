@@ -15,12 +15,24 @@ import argparse
 import sys
 
 from trader.config import load_settings
+from trader.strategies.baselines import DipBuyer, RegimeFilter, TsMomentum
 from trader.strategies.examples import RandomEntry, SmaCross
+from trader.strategies.ideas import FundingContrarian, WeekendGap
 from trader.validation import report_html
 from trader.validation.holdout import HoldoutLocked
 from trader.validation.pipeline import validate
 
-STRATEGIES = {"sma": SmaCross, "random": RandomEntry}
+STRATEGIES = {"sma": SmaCross, "random": RandomEntry, "momentum": TsMomentum, "dip": DipBuyer,
+              "regime": RegimeFilter, "weekend": WeekendGap, "funding": FundingContrarian}
+
+
+def _value(text: str):
+    for cast in (int, float):
+        try:
+            return cast(text)
+        except ValueError:
+            pass
+    return text
 
 
 def parse_grid(items: list[str]) -> dict | None:
@@ -29,7 +41,7 @@ def parse_grid(items: list[str]) -> dict | None:
     grid = {}
     for item in items:
         key, _, values = item.partition("=")
-        grid[key] = [int(x) if x.lstrip("-").isdigit() else float(x) for x in values.split(",")]
+        grid[key] = [_value(x) for x in values.split(",")]
     return grid
 
 
@@ -39,6 +51,8 @@ def main() -> int:
     p.add_argument("--symbols", required=True)
     p.add_argument("-g", "--grid", action="append", default=[], help="parameter values to try, e.g. fast=24,72")
     p.add_argument("--benchmark")
+    p.add_argument("--train-months", type=int, help="override walk-forward training window (recorded)")
+    p.add_argument("--test-months", type=int, help="override walk-forward test window (recorded)")
     p.add_argument("--holdout", action="store_true", help="use this idea's one look at the locked holdout")
     p.add_argument("--no-record", action="store_true", help="don't write to the ledger (for debugging only)")
     args = p.parse_args()
@@ -46,7 +60,8 @@ def main() -> int:
     cls = STRATEGIES[args.strategy]
     try:
         card = validate(cls, args.symbols.split(","), load_settings(), grid=parse_grid(args.grid),
-                        benchmark=args.benchmark, holdout=args.holdout, record=not args.no_record)
+                        benchmark=args.benchmark, holdout=args.holdout, record=not args.no_record,
+                        train_months=args.train_months, test_months=args.test_months)
     except HoldoutLocked as e:
         print(f"✗ Holdout refused: {e}")
         return 3

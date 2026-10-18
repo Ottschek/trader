@@ -178,7 +178,8 @@ svg {{ width:100%; height:auto; display:block; }}
 <body><main class="page">
 <header><h1>{escape(card.strategy)} · {escape(", ".join(card.symbols))}</h1>
 <div class="muted">Report card {card.id} · {card.created_at[:16].replace("T", " ")} UTC · code {escape(commit)} ·
-research data {card.research_window[0][:10]} → {card.research_window[1][:10]} (holdout locked)</div></header>
+research data {card.research_window[0][:10]} → {card.research_window[1][:10]} (holdout locked) ·
+walk-forward {card.train_years * 12:.0f}-month train / {card.test_months}-month test</div></header>
 <section class="card verdict"><div class="big {cls}" aria-hidden="true">{icon}</div>
 <div><h2 style="margin:0">{title}</h2><div class="muted">{blurb}</div></div></section>
 <section class="card"><h2>Gates</h2><div class="tw"><table><thead><tr><th>Result</th><th>Gate</th><th class="num">Value</th><th>Needs</th></tr></thead>
@@ -192,7 +193,7 @@ research data {card.research_window[0][:10]} → {card.research_window[1][:10]} 
 {_random_svg(card.random_sharpes, card.random_entry["strategy_sharpe"])}</section>
 <section class="card"><h2>Walk-forward folds</h2><p class="muted">{card.trials} parameter sets tried this run ·
 {card.total_trials} trials in the ledger in total · deflated Sharpe {card.deflated["probability"]:.2f}</p>
-<div class="tw"><table><thead><tr><th>Test window</th><th>Parameters picked on the prior 2 years</th><th class="num">Return</th></tr></thead>
+<div class="tw"><table><thead><tr><th>Test window</th><th>Parameters picked on the prior {card.train_years * 12:.0f} months</th><th class="num">Return</th></tr></thead>
 <tbody>{folds}</tbody></table></div></section>
 {holdout}
 </main></body></html>"""

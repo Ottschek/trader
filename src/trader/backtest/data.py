@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from trader.data.sessions import NY
-from trader.data.store import bars_path, corporate_actions_path, read
+from trader.data.store import bars_path, corporate_actions_path, funding_path, read
 
 SPIKE_THRESHOLD = {"crypto": 0.25, "stock": 0.15}
 
@@ -39,6 +39,7 @@ class MarketData:
     tradable: pd.DataFrame   # True where the asset has a bar (can trade at its open)
     venue: dict[str, str]    # symbol -> cost venue in settings.costs
     cleaned: dict[str, int] = field(default_factory=dict)  # bad ticks flattened per symbol
+    funding: pd.DataFrame | None = None  # Hyperliquid hourly funding rate per crypto symbol (if loaded)
 
     @property
     def index(self) -> pd.DatetimeIndex:
@@ -52,7 +53,8 @@ class MarketData:
         """The data as it looked at time `ts` (inclusive). Used by the lookahead check."""
         cut = lambda df: df.loc[:ts]  # noqa: E731
         return MarketData(cut(self.close), cut(self.open), cut(self.volume), cut(self.gap),
-                          cut(self.intra), cut(self.tradable), self.venue, self.cleaned)
+                          cut(self.intra), cut(self.tradable), self.venue, self.cleaned,
+                          cut(self.funding) if self.funding is not None else None)
 
 
 # --- per-asset preparation -----------------------------------------------------
@@ -128,8 +130,10 @@ def _window(df: pd.DataFrame, start, end) -> pd.DataFrame:
 
 
 def load_market(crypto=(), stocks=(), start=None, end=None, stock_session="regular",
-                clean=True) -> MarketData:
-    """Build aligned tables for the given symbols. `stock_session`: "regular" or "all"."""
+                clean=True, funding=False) -> MarketData:
+    """Build aligned tables for the given symbols. `stock_session`: "regular" or "all".
+    `funding=True` also loads Hyperliquid funding rates for the crypto symbols. A rate
+    stamped at hour h was settled at h, so it is known by the close of the bar starting at h."""
     cols: dict[str, dict[str, pd.Series]] = {k: {} for k in ("close", "open", "volume", "gap", "intra")}
     venue, cleaned = {}, {}
 
@@ -171,8 +175,16 @@ def load_market(crypto=(), stocks=(), start=None, end=None, stock_session="regul
 
     frames = {k: pd.DataFrame(v).sort_index() for k, v in cols.items()}
     tradable = frames["close"].notna()
+    funding_frame = None
+    if funding:
+        rates = {}
+        for s in crypto:
+            f = _window(read(funding_path(s.split("/")[0])), start, end)
+            if not f.empty:
+                rates[s] = f.drop_duplicates("ts").set_index("ts")["funding_rate"]
+        funding_frame = pd.DataFrame(rates).reindex(frames["close"].index)
     return MarketData(
         close=frames["close"], open=frames["open"], volume=frames["volume"],
         gap=frames["gap"].fillna(0.0), intra=frames["intra"].fillna(0.0),
-        tradable=tradable, venue=venue, cleaned=cleaned,
+        tradable=tradable, venue=venue, cleaned=cleaned, funding=funding_frame,
     )

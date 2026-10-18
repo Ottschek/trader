@@ -2,8 +2,13 @@
 
 For each bar t (see data.py for the timing model):
   1. gap:   positions held since the last close earn the close->open return
-  2. trade: targets decided at the close of bar t-1 fill at this open, for every asset
-            that has a bar now (a stock target set on Friday evening fills Monday's open).
+  2. trade: the latest targets that were *ready* by this bar's open fill now, for every
+            asset that has a bar (a stock target set on Friday evening fills Monday's open).
+            A decision made at row k is ready when every bar it could see has closed:
+            index[k] + BAR (bars are at most 1 hour). With one asset class this is simply
+            "decided at t-1, filled at t". With crypto (bars at :00) and stocks (regular
+            session bars at :30) mixed, it stops a decision that saw the 13:00-14:00 crypto
+            bar from filling at the 13:30 stock open.
             Each trade pays the venue's one-way cost on the traded weight.
   3. intra: the new positions earn the open->close return
 Positions drift with prices between trades. An asset is traded only when its target
@@ -18,6 +23,8 @@ import numpy as np
 import pandas as pd
 
 from trader.backtest.data import MarketData
+
+BAR = np.timedelta64(1, "h")  # longest bar we use; a decision is ready this long after its row starts
 
 
 @dataclass
@@ -51,6 +58,9 @@ def run_backtest(data: MarketData, targets: pd.DataFrame, cost_bps: dict[str, fl
         when = data.index[np.argmax(gross > max_gross + 1e-9)]
         raise BacktestError(f"targets use {gross.max():.2f}x gross exposure (limit {max_gross}x), first at {when}")
 
+    times = data.index.tz_convert("UTC").tz_localize(None).to_numpy().astype("datetime64[ns]")
+    # for each row, the last decision row whose information was complete by this row's open
+    ready_row = np.searchsorted(times + BAR, times, side="right") - 1
     gap, intra = data.gap.to_numpy(), data.intra.to_numpy()
     tradable = data.tradable.to_numpy()
     cost = np.array([cost_bps[s] / 10_000 for s in data.symbols])
@@ -71,8 +81,9 @@ def run_backtest(data: MarketData, targets: pd.DataFrame, cost_bps: dict[str, fl
         w = w * (1.0 + gap[t]) / g
         eq *= g
         # 2. trade at the open toward the targets decided at the previous close
-        if t > 0:
-            desired = np.nan_to_num(values[t - 1], nan=0.0)
+        k = ready_row[t]
+        if k >= 0:
+            desired = np.nan_to_num(values[k], nan=0.0)
             change = tradable[t] & ~np.isclose(desired, executed, atol=1e-12)
             if change.any():
                 dw = desired[change] - w[change]

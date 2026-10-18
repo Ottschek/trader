@@ -46,9 +46,10 @@ def backtest(strategy: Strategy, settings: Settings, start=None, end=None, data:
              benchmark: str | None = None, allow_short: bool = False) -> Report:
     bench = benchmark or benchmark_symbol(strategy, settings)
     if data is None:
-        symbols = set(strategy.symbols) | {bench}
+        symbols = set(strategy.symbols) | {bench} | set(strategy.signal_symbols)
         data = load_market(crypto=sorted(s for s in symbols if is_crypto(s)),
-                           stocks=sorted(s for s in symbols if not is_crypto(s)), start=start, end=end)
+                           stocks=sorted(s for s in symbols if not is_crypto(s)), start=start, end=end,
+                           funding=strategy.needs_funding)
     costs = cost_bps(data, settings)
     problems = check_no_lookahead(strategy, data)
     result = run_backtest(data, strategy.target_weights(data), costs, name=strategy.label(), allow_short=allow_short)

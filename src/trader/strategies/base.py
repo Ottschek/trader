@@ -19,6 +19,8 @@ from trader.backtest.data import MarketData
 class Strategy:
     name = "strategy"
     default_grid: dict[str, list] = {}   # parameter values the validation walk-forward tries
+    signal_symbols: list[str] = []       # extra symbols it reads but never trades (e.g. BTC for crypto stocks)
+    needs_funding = False                # needs Hyperliquid funding rates in the data
 
     def __init__(self, symbols, **params):
         self.symbols = list(symbols)
