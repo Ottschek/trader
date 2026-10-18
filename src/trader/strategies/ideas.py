@@ -80,16 +80,21 @@ class WeekendGapSized(WeekendGap):
         position = self._positions(data, self.params["threshold"], follow=True)
         held = pd.Series(position > 0, index=data.index)
         entry = held & ~held.shift(1, fill_value=False)
-        cap = 1.0 / len(self.symbols)
         out = {}
         for s in self.symbols:
-            c = data.close[s].dropna()
-            daily_vol = np.log(c).diff().rolling("30D").std() * np.sqrt(7)   # 7 regular bars a day
-            daily_vol = daily_vol.where(has_history(c, pd.Timedelta(days=30)))
-            size = (self.params["target_vol"] / daily_vol).clip(upper=1.0) * cap
+            size, _ = self.size_series(data, s)
             at_entry = size.reindex(data.index).ffill().where(entry).ffill()  # frozen for each trade
             out[s] = (position * at_entry.fillna(0.0).to_numpy())
         return pd.DataFrame(out, index=data.index)
+
+    def size_series(self, data: MarketData, symbol: str) -> tuple[pd.Series, pd.Series]:
+        """Position size (fraction of equity) and daily volatility on each of the stock's bars.
+        Shared with paper trading, so live sizes use exactly the backtested formula."""
+        c = data.close[symbol].dropna()
+        daily_vol = np.log(c).diff().rolling("30D").std() * np.sqrt(7)   # 7 regular bars a day
+        daily_vol = daily_vol.where(has_history(c, pd.Timedelta(days=30)))
+        size = (self.params["target_vol"] / daily_vol).clip(upper=1.0) / len(self.symbols)
+        return size, daily_vol
 
 
 class FundingContrarian(Strategy):

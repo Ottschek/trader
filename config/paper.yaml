@@ -1,0 +1,36 @@
+# Paper trading on the Alpaca PAPER account (fake money).
+#
+# SHADOW EXPERIMENT - NOT A VALIDATED CANDIDATE.
+# weekend_gap_sized passed 5 of 6 research gates but failed the deflated Sharpe (0.71 with
+# 29 trials, ledger run 630382563536). Paper trading it collects genuinely new, forward
+# out-of-sample evidence. The rules below are frozen: changing them would restart the
+# experiment. Results from before `start` don't count.
+
+experiment:
+  id: shadow-weekend-gap-sized-1
+  label: "SHADOW EXPERIMENT - not a validated candidate"
+  ledger_run: 630382563536
+  start: "2026-10-19"            # first trading morning after freezing
+  strategy: weekend_gap_sized
+  symbols: [COIN, MSTR, MARA, RIOT]
+  signal_symbol: BTC/USD
+  # Picked once with data before the holdout only (best Sharpe 2022-10-18 .. 2024-10-17,
+  # also the pick in each of the last 4 walk-forward folds). Frozen.
+  params:
+    threshold: 0.06
+    target_vol: 0.02
+
+# Execution, done by the Cloudflare Worker (cloudflare/scheduler) at 09:00 New York on trading days:
+#   - after a weekend/holiday: BTC move from the last stock close to 09:00 (Coinbase hourly
+#     candles, as in the backtest); if above threshold, market-on-open buys (fill 09:30)
+#   - next trading morning: market-on-open sells
+# Positions are sized by the plan the collector computes from the strategy code.
+execution:
+  decision_time_ny: "09:00"      # the 08:00-09:00 BTC bar has closed; OPG orders accepted until 09:28
+  weekend_gap_hours: 40          # longer than any weekday overnight break
+
+# Risk manager (also enforced by the Worker). Tighter than the strategy where they disagree.
+risk:
+  max_position_pct: 0.10         # per stock, fraction of equity
+  max_daily_loss_pct: 0.03       # close strategy positions and stop for the day
+  kill_switch_drawdown_pct: 0.15 # close everything and halt until /resume

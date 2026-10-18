@@ -1,36 +1,19 @@
 // Time-critical jobs on Cloudflare's clock. See wrangler.toml for the schedule.
 
-const HOUR = 3600 * 1000;
+import { makeAlpaca, telegram as sendTelegram } from "./clients.js";
+import { equitySnapshot, handleCommand, isDecisionTime, morning, paperConfig, refreshOrders, riskCheck } from "./paper.js";
+import { makeStore } from "./store.js";
+import { HOUR, escapeHtml, isoUtc, localTime, parseTs } from "./util.js";
+
+export { isoUtc, parseTs };
+
 const HYPERLIQUID = "https://api.hyperliquid.xyz/info";
-
-// --- helpers -------------------------------------------------------------------
-
-/** ISO timestamp in the same format the Python side writes: 2026-10-16T22:00:00+00:00 */
-export const isoUtc = (date) => date.toISOString().replace(/\.\d{3}Z$/, "+00:00");
-
-/** Parse timestamps written by Python, which may carry microseconds. */
-export const parseTs = (s) => Date.parse(s.replace(/(\.\d{3})\d+/, "$1"));
-
-export function localTime(date, timeZone) {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).format(date);
-}
 
 export function summaryDue(date, env) {
   return env.SUMMARY_TIMES.split(",").includes(localTime(date, env.TIMEZONE));
 }
 
-const escapeHtml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-async function telegram(env, text) {
-  const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, parse_mode: "HTML", disable_web_page_preview: true }),
-  });
-  if (!res.ok) throw new Error(`Telegram answered ${res.status}`);
-}
+const telegram = (env, text) => sendTelegram(env, fetch, text);
 
 // --- open interest snapshot ------------------------------------------------------
 
@@ -153,26 +136,71 @@ export function jobsAt(now, env) {
   return jobs;
 }
 
+/** Paper-trading jobs for this firing (only when Alpaca paper keys are configured). */
+export function paperJobsAt(now, env) {
+  if (!env.ALPACA_API_KEY) return [];
+  const jobs = ["paper_orders"];
+  if (isDecisionTime(now)) jobs.push("paper_morning");
+  jobs.push("paper_risk");
+  if (now.getUTCMinutes() < 30) jobs.push("paper_equity");
+  return jobs;
+}
+
+function paperContext(env, now) {
+  return { c: paperConfig(env), env, http: fetch, store: makeStore(env.DB), alpaca: makeAlpaca(env, fetch), now };
+}
+
 async function run(now, env) {
   const handlers = {
     snapshot: ["open interest snapshot", () => recordSnapshot(env, now)],
     watchdog: ["watchdog", () => watchdog(env, now)],
     summary: ["daily summary", () => sendSummary(env, now)],
+    paper_orders: ["paper: order updates", () => refreshOrders(paperContext(env, now))],
+    paper_morning: ["paper: 09:00 decision", () => morning(paperContext(env, now))],
+    paper_risk: ["paper: risk check", async () => {
+      const ctx = paperContext(env, now);
+      if ((await ctx.alpaca.clock()).is_open) await riskCheck(ctx);
+    }],
+    paper_equity: ["paper: equity snapshot", () => equitySnapshot(paperContext(env, now))],
   };
-  const jobs = jobsAt(now, env).map((j) => handlers[j]);
-  for (const [name, job] of jobs) {
+  for (const name of [...jobsAt(now, env), ...paperJobsAt(now, env)]) {
+    const [label, job] = handlers[name];
     try {
       await job();
     } catch (err) {
       // Nothing else watches these jobs, so report failures loudly.
-      await telegram(env, `🚨 Scheduler job "${name}" failed: ${escapeHtml(err.message)}`).catch(() => {});
-      console.error(name, err);
+      await telegram(env, `🚨 Scheduler job "${label}" failed: ${escapeHtml(err.message)}`).catch(() => {});
+      console.error(label, err);
     }
   }
+}
+
+/** Telegram webhook: POST /telegram/<secret>, only from your own chat. */
+async function telegramWebhook(request, env) {
+  const url = new URL(request.url);
+  const secret = env.TELEGRAM_WEBHOOK_SECRET;
+  if (request.method !== "POST" || !secret || url.pathname !== `/telegram/${secret}` ||
+      request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
+    return new Response("Not found", { status: 404 });
+  }
+  const update = await request.json().catch(() => ({}));
+  const msg = update.message;
+  if (!msg || String(msg.chat?.id) !== String(env.TELEGRAM_CHAT_ID)) return new Response("ok");   // ignore strangers
+  let reply;
+  try {
+    reply = env.ALPACA_API_KEY ? await handleCommand(paperContext(env, new Date()), msg.text) : "Paper trading isn't configured.";
+  } catch (err) {
+    reply = `Command failed: ${escapeHtml(err.message)}`;
+  }
+  await telegram(env, reply).catch(() => {});
+  return new Response("ok");
 }
 
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(run(new Date(event.scheduledTime), env));
+  },
+  async fetch(request, env) {
+    return telegramWebhook(request, env);
   },
 };

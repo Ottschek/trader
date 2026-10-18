@@ -192,6 +192,19 @@ def sync_ledger_to_d1(settings) -> None:
         print(f"Ledger: {n} new experiments synced to D1")
 
 
+def save_paper_plan(settings, now) -> None:
+    """Position sizes for the next paper weekend trade (read by the Worker at 09:00 New York)."""
+    from trader.monitor.d1 import D1
+    from trader.paper import plan
+
+    try:
+        p = plan.build_plan(now)
+        plan.save_plan(D1(settings.cloud.d1_database_id), p)
+        print(f"Paper plan as of {p['as_of'][:16]}: {p['sizes']}")
+    except Exception as e:  # noqa: BLE001 - never let paper trading break data collection
+        print(f"Paper plan not updated: {type(e).__name__}: {e}")
+
+
 def report_to_cloud(settings, now, results, previous, added, duration_s) -> None:
     from trader.data import r2
     from trader.monitor import report, telegram
@@ -202,6 +215,7 @@ def report_to_cloud(settings, now, results, previous, added, duration_s) -> None
     report.record_run(D1(settings.cloud.d1_database_id), now, results, added, duration_s, trigger)
     print(f"Pushing changed files to R2: {r2.push(settings.cloud.r2_bucket)} uploaded")
     sync_ledger_to_d1(settings)
+    save_paper_plan(settings, now)
     alert = report.failure_alert(results, previous)
     if alert:
         telegram.send(alert)
