@@ -184,6 +184,11 @@ Baselines: trend, mean reversion, regime filter. Crazy ideas using existing data
 Notes:
 - **Weekend gap is the one real lead:** its timing beat 99.8% of random shuffles and it beat SPY, but returns
   were too volatile (Sharpe 0.88, drawdown −26%). Worth refining (e.g. position sizing by BTC move, fewer stocks).
+- **Refinement (`weekend_gap_sized`, 2026-10-18):** diagnosis showed the bitcoin miners (MARA, RIOT) carried
+  most of the risk and fading always lost. Fixed before testing: follow only, each stock sized to a target daily
+  volatility. Result: OOS Sharpe **1.19**, beats SPY (0.79), max drawdown **−7.8%**, random timing p = 0.002 —
+  5 of 6 gates — but **deflated Sharpe 0.71** with 29 trials → rejected, no holdout look. Not to be tweaked further
+  on research data (that would be p-hacking); the honest next evidence is new, forward data.
 - Trial count after M4: 25. Every new idea now has to clear a higher deflated-Sharpe bar.
 - Engine fix found while building M4: decisions only fill once every bar they could see has closed (mixed
   crypto :00 / stock :30 bars), so no strategy can use a crypto bar that closes after the stock trade.
