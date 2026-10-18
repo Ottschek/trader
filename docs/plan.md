@@ -169,9 +169,24 @@ How it works (`src/trader/validation/`, rules in `config/settings.yaml` → `val
   histogram and the parameters picked in each fold.
 - Run: `.venv/bin/python scripts/validate.py sma --symbols BTC/USD` (add `--holdout` for the one-time look).
 
-### M4 — First strategies
+### M4 — First strategies ✅ (2026-10-18)
 Baselines: trend, mean reversion, regime filter. Crazy ideas using existing data: weekend gap predictor, funding rate signal.
-✅ Done when each has a report card (expect most to fail).
+✅ Done when each has a report card (expect most to fail). **All five rejected** — the harness doing its job.
+
+| Idea | Universe | OOS Sharpe | vs hold | Max DD | Random timing p | Deflated | Killed by |
+|---|---|---|---|---|---|---|---|
+| Trend (`ts_momentum`) | 10 coins | 0.67 | 0.68 | −62.9% | 0.112 | 0.22 | everything but honesty |
+| Dip buying (`dip_buyer`) | 10 coins | 0.43 | 0.68 | −9.8% | 0.168 | 0.09 | Sharpe, hold, random, deflated |
+| Regime filter (`regime_filter`) | SPY | 0.68 | 0.78 | −19.9% | 0.387 | 0.91 | Sharpe, hold, random, deflated |
+| Weekend gap (`weekend_gap`) | COIN, MSTR, MARA, RIOT | 0.88 | 0.79 (SPY) | −25.7% | **0.002** | 0.56 | Sharpe, drawdown, deflated |
+| Funding contrarian (`funding_contrarian`) | 10 coins, 6m/2m windows | 0.49 | 1.12 | −22.2% | 0.309 | 0.07 | everything but honesty |
+
+Notes:
+- **Weekend gap is the one real lead:** its timing beat 99.8% of random shuffles and it beat SPY, but returns
+  were too volatile (Sharpe 0.88, drawdown −26%). Worth refining (e.g. position sizing by BTC move, fewer stocks).
+- Trial count after M4: 25. Every new idea now has to clear a higher deflated-Sharpe bar.
+- Engine fix found while building M4: decisions only fill once every bar they could see has closed (mixed
+  crypto :00 / stock :30 bars), so no strategy can use a crypto bar that closes after the stock trade.
 
 ### M5 — Paper trading
 Hourly runner sends the best candidate's orders to Alpaca paper through the risk manager:
