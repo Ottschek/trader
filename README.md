@@ -30,6 +30,11 @@ cp .env.example .env   # then put your Alpaca PAPER keys in .env
 | Alpaca stocks | 30-min raw bars → session-tagged hourly bars (pre / regular / post) | 2016 |
 | Alpaca corporate actions | splits and dividends, applied on read | 2016 |
 | Hyperliquid | funding rate history + hourly open interest snapshots | May 2023 / from now |
+| DefiLlama | daily USDT / USDC circulating supply | 2017 |
+| Wikipedia | daily pageviews per symbol (attention) | 2016 (or article start) |
+| Farside | daily US spot Bitcoin ETF net flows per fund | Jan 2024 |
+| Polymarket | hourly snapshot of the 100 most-traded markets | from now |
+| Coinbase / Kraken | new trading pairs (listings) | from now |
 
 Stored as Parquet under `data/` (git-ignored), queryable with DuckDB via `trader.data.store.connect()`.
 

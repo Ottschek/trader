@@ -69,6 +69,7 @@ class Settings:
     costs: dict[str, VenueCosts]
     cloud: CloudSettings | None = None
     validation: ValidationSettings | None = None
+    alt_data: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,7 @@ def load_settings(path: Path = DEFAULT_SETTINGS_PATH) -> Settings:
         validation=ValidationSettings(**{k: (str(v) if k.endswith("_start") else v)
                                          for k, v in raw["validation"].items()})
         if "validation" in raw else None,
+        alt_data=raw.get("alt_data"),
     )
 
 

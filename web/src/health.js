@@ -3,8 +3,11 @@
 const HOUR = 3600 * 1000;
 
 // How old the newest bar may be before a dataset counts as stale (mirrors scripts/collect.py).
+const ALT_MAX_AGE = { stablecoins: 72, pageviews: 96, etf_flows: 120, polymarket: 3, listings: null };
+
 export function maxAgeHours(row) {
   if (row.kind === "corporate_actions") return null;
+  if (row.kind === "alt") return ALT_MAX_AGE[row.source] ?? null;   // listings only change when something lists
   if (row.kind === "snapshots") return 2;
   if (row.kind === "funding") return 3;
   if (row.source.startsWith("alpaca_stocks")) return 96; // weekends and holidays
@@ -46,15 +49,16 @@ const DATASET_GROUPS = [
   ["funding", "hyperliquid", "Funding rates · Hyperliquid"],
   ["snapshots", "hyperliquid", "Open interest snapshots · Hyperliquid"],
   ["corporate_actions", "alpaca", "Splits & dividends · Alpaca"],
+  ["alt", "*", "Alternative data · stablecoins, Wikipedia attention, ETF flows, Polymarket, listings"],
 ];
 
 export function groupDatasets(datasets) {
   const groups = DATASET_GROUPS.map(([kind, source, label]) => ({
     label,
-    rows: datasets.filter((d) => d.kind === kind && d.source === source),
+    rows: datasets.filter((d) => d.kind === kind && (source === "*" || d.source === source)),
   })).filter((g) => g.rows.length);
   const known = new Set(DATASET_GROUPS.map(([k, s]) => `${k}/${s}`));
-  const other = datasets.filter((d) => !known.has(`${d.kind}/${d.source}`));
+  const other = datasets.filter((d) => !known.has(`${d.kind}/${d.source}`) && !known.has(`${d.kind}/*`));
   if (other.length) groups.push({ label: "Other", rows: other });
   return groups;
 }

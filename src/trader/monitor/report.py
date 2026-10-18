@@ -24,8 +24,11 @@ def dataset_status_rows(now: pd.Timestamp) -> list[tuple]:
         rel = path.relative_to(root).with_suffix("").as_posix()
         parts = rel.split("/")
         kind = parts[0]
-        source = parts[1] if kind in ("bars", "funding") else ("hyperliquid" if kind == "snapshots" else "alpaca")
-        symbol = parts[2] if kind in ("bars", "funding") else None
+        if kind == "alt":
+            source, symbol = parts[1], None
+        else:
+            source = parts[1] if kind in ("bars", "funding") else ("hyperliquid" if kind == "snapshots" else "alpaca")
+            symbol = parts[2] if kind in ("bars", "funding") else None
         ts = pd.read_parquet(path, columns=["ex_date" if kind == "corporate_actions" else "ts"]).iloc[:, 0]
         rows.append((rel, kind, source, symbol, len(ts),
                      ts.min().isoformat() if len(ts) else None,

@@ -81,3 +81,35 @@ validation:
   max_p_value: 0.05             # must beat 95% of random-entry versions of itself
   min_deflated_sharpe: 0.95     # probability the Sharpe is real after counting every trial
   random_trials: 500
+
+# Alternative data collectors (src/trader/data/alt.py). Free sources; daily ones refresh once a day.
+alt_data:
+  stablecoins: {USDT: 1, USDC: 2}          # DefiLlama stablecoin ids (full daily history)
+  # Wikipedia pageviews as an attention gauge (history since 2015). Renamed articles: views
+  # of the old and new title are added up.
+  wikipedia:
+    BTC/USD: [Bitcoin]
+    ETH/USD: [Ethereum]
+    SOL/USD: [Solana_(blockchain_platform)]
+    DOGE/USD: [Dogecoin]
+    LTC/USD: [Litecoin]
+    AVAX/USD: [Avalanche_(blockchain_platform)]
+    LINK/USD: [Chainlink_(blockchain)]
+    UNI/USD: [Uniswap]
+    AAVE/USD: [Aave]
+    BCH/USD: [Bitcoin_Cash]
+    COIN: [Coinbase]
+    MSTR: [MicroStrategy]
+    MARA: [MARA_Holdings, Marathon_Digital_Holdings, Marathon_Patent_Group]
+    NVDA: [Nvidia]
+    TSLA: ["Tesla,_Inc.", Tesla_Motors]
+    AAPL: [Apple_Inc.]
+    AMZN: [Amazon_(company)]
+    MSFT: [Microsoft]
+    GOOGL: [Alphabet_Inc.]
+    META: [Meta_Platforms, "Facebook,_Inc."]
+    JPM: [JPMorgan_Chase]
+    XOM: [ExxonMobil]
+    SPY: [SPDR_S&P_500_Trust_ETF]
+    QQQ: [Invesco_QQQ]
+  polymarket_top_n: 100                     # hourly snapshot of the most-traded markets

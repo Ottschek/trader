@@ -22,11 +22,11 @@ import time
 import pandas as pd
 
 from trader.config import ConfigError, load_alpaca_secrets, load_settings
-from trader.data import alpaca_data, coinbase, hyperliquid
+from trader.data import alpaca_data, alt, coinbase, hyperliquid
 from trader.data import quality as q
 from trader.data.store import bars_path, data_dir, funding_path, read, snapshots_path
 
-ALL_SOURCES = ["coinbase", "alpaca_crypto", "hyperliquid", "alpaca_stocks"]
+ALL_SOURCES = ["coinbase", "alpaca_crypto", "hyperliquid", "alpaca_stocks", "alt"]
 
 
 def coin_of(symbol: str) -> str:
@@ -47,9 +47,11 @@ def download(sources, crypto, stocks, settings, now, snapshot=True) -> tuple[lis
             n = fn(*args)
             added += n
             print(f"  {dataset}: +{n} rows ({time.time() - t0:.0f}s)")
+            return n
         except Exception as e:
             print(f"  {dataset}: ERROR {type(e).__name__}: {e}")
             results.append(q.CheckResult("download", dataset, q.FAIL, f"{type(e).__name__}: {e}"[:300]))
+            return None
 
     if "coinbase" in sources:
         print("Coinbase spot (hourly)")
@@ -80,6 +82,9 @@ def download(sources, crypto, stocks, settings, now, snapshot=True) -> tuple[lis
             for s in stocks:
                 run(f"alpaca_stocks {s}", alpaca_data.update_stock, s, settings.history_start, now, secrets)
             run("corporate actions", alpaca_data.update_corporate_actions, list(stocks), settings.history_start, secrets)
+    if "alt" in sources:
+        print("Alternative data (stablecoins, Wikipedia attention, ETF flows, Polymarket, listings)")
+        alt.collect_all(settings, now, run)
     return results, added
 
 
@@ -112,6 +117,16 @@ def run_checks(sources, crypto, stocks, now) -> list[q.CheckResult]:
                            else [q.CheckResult("staleness", name, q.FAIL, "no data")])
         snap = read(snapshots_path())
         results.append(q.check_staleness(snap, "hyperliquid snapshot", now, 2))
+
+    if "alt" in sources:
+        for name, (path, max_age) in alt.staleness_targets().items():
+            df = read(path)
+            results.append(q.check_staleness(df, f"alt {name}", now, max_age) if not df.empty
+                           else q.CheckResult("staleness", f"alt {name}", q.FAIL, "no data"))
+        checked = alt.load_state().get("listings_checked")
+        age = (now - pd.Timestamp(checked)) / pd.Timedelta(hours=1) if checked else None
+        results.append(q.CheckResult("staleness", "alt listings", q.OK if age is not None and age <= 3 else q.FAIL,
+                                     f"pair lists checked {age:.1f}h ago" if age is not None else "never checked"))
 
     if "alpaca_stocks" in sources and any(bars_path("alpaca_stocks", s).exists() for s in stocks):
         for s in stocks:
