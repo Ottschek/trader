@@ -17,14 +17,14 @@ import sys
 from trader.config import load_settings
 from trader.strategies.baselines import DipBuyer, RegimeFilter, TsMomentum
 from trader.strategies.examples import RandomEntry, SmaCross
-from trader.strategies.ideas import FundingContrarian, WeekendGap, WeekendGapSized
+from trader.strategies.ideas import ComboSleeves, FundingContrarian, WeekendGap, WeekendGapSized
 from trader.validation import report_html
 from trader.validation.holdout import HoldoutLocked
 from trader.validation.pipeline import validate
 
 STRATEGIES = {"sma": SmaCross, "random": RandomEntry, "momentum": TsMomentum, "dip": DipBuyer,
               "regime": RegimeFilter, "weekend": WeekendGap, "weekend_sized": WeekendGapSized,
-              "funding": FundingContrarian}
+              "funding": FundingContrarian, "combo": ComboSleeves}
 
 
 def _value(text: str):

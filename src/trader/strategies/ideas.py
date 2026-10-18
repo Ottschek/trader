@@ -129,3 +129,39 @@ class FundingContrarian(Strategy):
             # only hold while the coin actually has spot bars to trade
             out[s] = held.reindex(data.index).ffill().fillna(False).astype(float) * w
         return pd.DataFrame(out).reindex(data.index)
+
+
+CRYPTO_BASKET = ["BTC/USD", "ETH/USD", "SOL/USD", "LTC/USD", "DOGE/USD", "AVAX/USD", "LINK/USD", "UNI/USD", "AAVE/USD", "BCH/USD"]
+CRYPTO_STOCKS = ["COIN", "MSTR", "MARA", "RIOT"]
+
+
+class ComboSleeves(Strategy):
+    """Three weak, unrelated signals as one portfolio, a third of the account each:
+      - weekend gap (sized) on crypto stocks: trades Monday sessions after big BTC weekends
+      - regime filter on SPY: in the stock market above its moving average
+      - trend on the crypto basket: in coins with a positive recent return
+    They trade different markets at different times, so their swings partly offset.
+    The walk-forward picks each sleeve's setting per fold from a small grid."""
+    name = "combo_sleeves"
+    signal_symbols = ["BTC/USD"]
+    default_grid = {"weekend_threshold": [0.03, 0.06], "regime_days": [100, 200], "momentum_days": [7, 30]}
+
+    def __init__(self, symbols=None, weekend_threshold: float = 0.06, regime_days: int = 100, momentum_days: int = 7):
+        symbols = list(symbols) if symbols else CRYPTO_STOCKS + ["SPY"] + CRYPTO_BASKET
+        super().__init__(symbols, weekend_threshold=weekend_threshold, regime_days=regime_days,
+                         momentum_days=momentum_days)
+
+    def target_weights(self, data: MarketData) -> pd.DataFrame:
+        from trader.strategies.baselines import RegimeFilter, TsMomentum
+
+        third = 1.0 / 3.0
+        sleeves = [
+            WeekendGapSized(CRYPTO_STOCKS, threshold=self.params["weekend_threshold"], target_vol=0.02),
+            RegimeFilter(["SPY"], sma_days=self.params["regime_days"]),
+            TsMomentum(CRYPTO_BASKET, lookback_days=self.params["momentum_days"]),
+        ]
+        total = pd.DataFrame(0.0, index=data.index, columns=self.symbols)
+        for sleeve in sleeves:
+            w = sleeve.target_weights(data).reindex(data.index).ffill().fillna(0.0)
+            total[w.columns] += third * w
+        return total

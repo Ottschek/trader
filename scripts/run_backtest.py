@@ -16,11 +16,11 @@ from trader.backtest.runner import backtest
 from trader.config import load_settings
 from trader.strategies.baselines import DipBuyer, RegimeFilter, TsMomentum
 from trader.strategies.examples import BuyAndHold, PeekAhead, SmaCross
-from trader.strategies.ideas import FundingContrarian, WeekendGap, WeekendGapSized
+from trader.strategies.ideas import ComboSleeves, FundingContrarian, WeekendGap, WeekendGapSized
 
 STRATEGIES = {"hold": BuyAndHold, "sma": SmaCross, "peek": PeekAhead, "momentum": TsMomentum,
               "dip": DipBuyer, "regime": RegimeFilter, "weekend": WeekendGap, "weekend_sized": WeekendGapSized,
-              "funding": FundingContrarian}
+              "funding": FundingContrarian, "combo": ComboSleeves}
 
 
 def parse_param(text: str):

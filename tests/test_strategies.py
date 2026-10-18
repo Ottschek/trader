@@ -158,3 +158,19 @@ def test_weekend_gap_sized_gives_volatile_stocks_smaller_positions():
     assert held["WILD"].max() < held["CALM"].max() <= 0.5 + 1e-12       # risky stock gets less, cap is 1/n
     assert held["CALM"].nunique() == 1 and held["WILD"].nunique() == 1  # size frozen during the trade
     assert check_no_lookahead(strat, data) == []
+
+
+def test_combo_sleeves_splits_the_account_in_thirds_and_is_honest():
+    from trader.strategies.ideas import CRYPTO_BASKET, CRYPTO_STOCKS, ComboSleeves
+    stock_ts = stock_hours(60, start="2023-10-02")
+    rng = np.random.default_rng(9)
+    for s in CRYPTO_STOCKS + ["SPY"]:
+        write_bars("alpaca_stocks", s, stock_ts, 50 * np.exp(np.cumsum(rng.normal(0.0002, 0.004, len(stock_ts)))), session="regular")
+    for i, c in enumerate(CRYPTO_BASKET):
+        crypto_walk(c, start="2023-09-25", days=110, seed=20 + i, drift=0.0003)
+    data = load_market(crypto=CRYPTO_BASKET, stocks=CRYPTO_STOCKS + ["SPY"])
+    strat = ComboSleeves(regime_days=30, momentum_days=7)
+    w = strat.target_weights(data)
+    assert w.sum(axis=1).max() <= 1.0 + 1e-9
+    assert w["SPY"].max() <= 1 / 3 + 1e-9 and w[CRYPTO_BASKET].sum(axis=1).max() <= 1 / 3 + 1e-9
+    assert check_no_lookahead(strat, data) == []
