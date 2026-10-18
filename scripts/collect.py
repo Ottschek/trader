@@ -205,6 +205,25 @@ def save_paper_plan(settings, now) -> None:
         print(f"Paper plan not updated: {type(e).__name__}: {e}")
 
 
+def reconcile_paper(settings, now) -> None:
+    """Live vs backtest for the paper experiment; Telegram alert when a new decision mismatch appears."""
+    from trader.monitor import telegram
+    from trader.monitor.d1 import D1
+    from trader.paper import reconcile
+
+    try:
+        r = reconcile.run_and_save(D1(settings.cloud.d1_database_id), settings, now)
+        track = r["tracking_difference"]
+        print(f"Paper vs backtest: {len(r['trades'])} weekend sessions, {len(r['mismatches'])} mismatches, "
+              f"tracking difference {'n/a' if track is None else f'{track:+.2%}'}")
+        if r["new_mismatches"]:
+            telegram.send("⚠️ <b>Paper vs backtest mismatch</b> on " + ", ".join(r["new_mismatches"]) +
+                          ": the live bot and the backtest disagreed about trading. See the Paper tab: "
+                          "https://trader-web-6t6.pages.dev/#/paper")
+    except Exception as e:  # noqa: BLE001 - never let paper trading break data collection
+        print(f"Paper reconcile skipped: {type(e).__name__}: {e}")
+
+
 def report_to_cloud(settings, now, results, previous, added, duration_s) -> None:
     from trader.data import r2
     from trader.monitor import report, telegram
@@ -216,6 +235,7 @@ def report_to_cloud(settings, now, results, previous, added, duration_s) -> None
     print(f"Pushing changed files to R2: {r2.push(settings.cloud.r2_bucket)} uploaded")
     sync_ledger_to_d1(settings)
     save_paper_plan(settings, now)
+    reconcile_paper(settings, now)
     alert = report.failure_alert(results, previous)
     if alert:
         telegram.send(alert)

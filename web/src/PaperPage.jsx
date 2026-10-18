@@ -27,28 +27,86 @@ function ShadowBanner() {
   );
 }
 
-function EquityChart({ points }) {
-  if (points.length < 2) return <p className="muted">The equity curve appears after a few hourly snapshots.</p>;
-  const W = 760, H = 200, L = 56, R = 12, T = 10, B = 24;
-  const ys = points.map((p) => p.equity);
-  let lo = Math.min(...ys), hi = Math.max(...ys);
+function EquityChart({ points, expected }) {
+  const actual = points.map((p) => [Date.parse(p.ts), p.equity]);
+  const exp = (expected || []).map(([t, v]) => [Date.parse(t), v]);
+  if (actual.length < 2) return <p className="muted">The equity curve appears after a few hourly snapshots.</p>;
+  const all = [...actual, ...exp];
+  const W = 760, H = 220, L = 60, R = 84, T = 10, B = 24;
+  const t0 = Math.min(...all.map((p) => p[0])), t1 = Math.max(...all.map((p) => p[0]));
+  let lo = Math.min(...all.map((p) => p[1])), hi = Math.max(...all.map((p) => p[1]));
   if (hi - lo < 1) { lo -= 50; hi += 50; }
-  const x = (i) => L + ((W - L - R) * i) / (points.length - 1);
+  const x = (t) => L + ((W - L - R) * (t - t0)) / Math.max(t1 - t0, 1);
   const y = (v) => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
-  const line = points.map((p, i) => `${x(i).toFixed(1)},${y(p.equity).toFixed(1)}`).join(" ");
+  const path = (pts) => pts.map(([t, v]) => `${x(t).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const lastA = actual.at(-1), lastE = exp.at(-1);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="equity-svg" role="img"
-         aria-label={`Paper equity from ${usd(ys[0])} to ${usd(ys.at(-1))}`}>
-      {[lo, (lo + hi) / 2, hi].map((v) => (
-        <g key={v}>
-          <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} className="grid-line" />
-          <text x={L - 8} y={y(v) + 4} textAnchor="end" className="axis-text">{usd(v)}</text>
-        </g>
-      ))}
-      <text x={L} y={H - 6} className="axis-text">{shortDate(points[0].ts)}</text>
-      <text x={W - R} y={H - 6} textAnchor="end" className="axis-text">{shortDate(points.at(-1).ts)}</text>
-      <polyline points={line} className="equity-line" />
-    </svg>
+    <>
+      <svg viewBox={`0 0 ${W} ${H}`} className="equity-svg" role="img"
+           aria-label={`Paper equity ${usd(lastA[1])}${lastE ? `, backtest expects ${usd(lastE[1])}` : ""}`}>
+        {[lo, (lo + hi) / 2, hi].map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} className="grid-line" />
+            <text x={L - 8} y={y(v) + 4} textAnchor="end" className="axis-text">{usd(v)}</text>
+          </g>
+        ))}
+        <text x={L} y={H - 6} className="axis-text">{shortDate(new Date(t0).toISOString())}</text>
+        <text x={W - R} y={H - 6} textAnchor="end" className="axis-text">{shortDate(new Date(t1).toISOString())}</text>
+        {exp.length > 1 && <polyline points={path(exp)} className="expected-line" />}
+        <polyline points={path(actual)} className="equity-line" />
+        <text x={x(lastA[0]) + 6} y={y(lastA[1]) + 4} className="series-label">Paper</text>
+        {lastE && <text x={x(lastE[0]) + 6} y={y(lastE[1]) + (Math.abs(y(lastE[1]) - y(lastA[1])) < 14 ? 18 : 4)}
+                        className="series-label">Backtest</text>}
+      </svg>
+      <div className="legend">
+        <span className="legend-item"><span className="swatch-line paper" aria-hidden="true" />Paper account (actual)</span>
+        <span className="legend-item"><span className="swatch-line backtest" aria-hidden="true" />Backtest (expected)</span>
+      </div>
+    </>
+  );
+}
+
+function LiveVsBacktest({ r }) {
+  if (!r) return null;
+  const fmt = (v) => (v == null ? "—" : pct(v, 2));
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>Live vs backtest</h2>
+        <span className="muted">the frozen strategy re-run through the backtest engine · {shortDateTime(r.computed_at)}</span>
+      </div>
+      <div className="mini-stats">
+        <div><span className="muted small">Paper return</span><strong>{fmt(r.actual_return)}</strong></div>
+        <div><span className="muted small">Backtest expected</span><strong>{fmt(r.expected_return)}</strong></div>
+        <div><span className="muted small">Tracking difference</span><strong>{fmt(r.tracking_difference)}</strong></div>
+        <div><span className="muted small">Avg fill vs open</span>
+          <strong>{r.avg_slippage_bps == null ? "—" : `${r.avg_slippage_bps} bps`}</strong></div>
+        <div><span className="muted small">Decision mismatches</span>
+          <strong>{r.mismatches.length ? <StatusBadge status="fail">{r.mismatches.length}</StatusBadge> : <StatusBadge status="ok">0</StatusBadge>}</strong></div>
+      </div>
+      {r.trades.length === 0 ? (
+        <p className="muted">No weekend sessions since the experiment started ({shortDate(r.start)}).</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="table">
+            <thead><tr><th>Session</th><th className="num">BTC move</th><th>Backtest</th><th>Paper</th><th>Agree?</th></tr></thead>
+            <tbody>
+              {r.trades.map((t) => (
+                <tr key={t.session}>
+                  <td>{t.session}</td>
+                  <td className="num">{t.btc_move == null ? "—" : pct(t.btc_move)}</td>
+                  <td>{t.backtest_traded ? `traded ${fmt(t.backtest_return)}` : "no trade"}</td>
+                  <td>{t.live_decision === "entry" ? `traded ${fmt(t.live_return)}` : t.live_decision.replace("_", " ")}</td>
+                  <td><StatusBadge status={t.match ? "ok" : "fail"}>{t.match ? "yes" : "no"}</StatusBadge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="muted small">Positive slippage = paid more than the backtest assumed. A mismatch means live and backtest
+        disagreed about trading (different data or timing) and triggers a Telegram alert.</p>
+    </section>
   );
 }
 
@@ -158,9 +216,10 @@ function Paper({ data }) {
               status={halted ? "fail" : "ok"} />
       </div>
       <section className="card">
-        <div className="card-head"><h2>Paper equity</h2><span className="muted">hourly snapshots, last 90 days</span></div>
-        <EquityChart points={eq} />
+        <div className="card-head"><h2>Paper equity vs backtest</h2><span className="muted">hourly snapshots, last 90 days</span></div>
+        <EquityChart points={eq} expected={data.reconcile?.expected_curve} />
       </section>
+      <LiveVsBacktest r={data.reconcile} />
       <Plan plan={data.plan} />
       <Decisions decisions={data.decisions} />
       <Orders orders={data.orders} />

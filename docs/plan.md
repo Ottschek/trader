@@ -214,9 +214,18 @@ No strategy has passed every gate yet, so the pipeline runs **weekend_gap_sized 
 - Known difference from the backtest: on a Monday holiday the live bot decides on Tuesday morning with
   Tuesday's BTC move (the backtest used Monday 08:00's).
 
-### M6 — Monitoring
+### M6 — Monitoring ✅ (built 2026-10-18)
 Web app gains live-vs-backtest comparison on top of the views added in M1–M5.
 ✅ Done when you can see at a glance whether live matches backtest.
+
+- `src/trader/paper/reconcile.py`, run by every collector cloud run: re-runs the frozen strategy (with the bot's
+  10% risk cap) through the backtest engine over the shadow period and compares **equity** (paper vs expected,
+  tracking difference), **decisions** (each weekend: did both trade or both stay out?) and **fills** (fill price
+  vs the 09:30 open the backtest assumed, in bps). Stored in D1 `paper_reconcile`.
+- **Telegram alert** when a new decision mismatch appears (each mismatch alerts once).
+- **Paper tab:** paper equity vs backtest chart, live-vs-backtest stats and a weekend-by-weekend table.
+- **Keep-alive** (`.github/workflows/keepalive.yml`): re-enables the scheduled collector twice a month so GitHub's
+  60-day inactivity pause can't silently stop it; the Worker's watchdog is the backstop.
 
 ### M7+ — The big stuff
 Strategy evolution ("Darwin"), LLM news analyst, AI trading desk, perps on a futures testnet,
