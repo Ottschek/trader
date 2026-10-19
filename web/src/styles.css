@@ -153,3 +153,16 @@ main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .mini-stats > div { display: grid; gap: 4px; }
 .mini-stats strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 @media (max-width: 860px) { .mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* overview */
+.tile-link { color: inherit; text-decoration: none; transition: border-color 0.15s; }
+.tile-link:hover { border-color: var(--text-3); }
+.tile-link:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.overview-banner p { margin: 6px 0 0; }
+.upcoming { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.upcoming li { display: grid; gap: 2px; }
+.tiles-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .tiles-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .tiles-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.exp-name { white-space: nowrap; }
+.exp-name .small { display: block; }

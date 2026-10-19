@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import HealthPage from "./HealthPage.jsx";
 import LabPage from "./LabPage.jsx";
+import OverviewPage from "./OverviewPage.jsx";
 import PaperPage from "./PaperPage.jsx";
 
 const PAGES = [
-  ["#/", "Data health", HealthPage],
+  ["#/", "Overview", OverviewPage],
+  ["#/health", "Data health", HealthPage],
   ["#/lab", "Strategy lab", LabPage],
   ["#/paper", "Paper", PaperPage],
 ];
