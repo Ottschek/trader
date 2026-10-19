@@ -158,7 +158,7 @@ def main() -> int:
     if args.cloud:
         from trader.data import r2
         print(f"Pulling data from R2 bucket {settings.cloud.r2_bucket}")
-        print(f"  {r2.pull(settings.cloud.r2_bucket)} files downloaded")
+        print(f"  {r2.pull(settings.cloud.r2_bucket, prefixes=r2.COLLECTOR_PREFIXES)} files downloaded")
         merge_worker_snapshots(settings)
     previous = json.loads(out.read_text())["results"] if out.exists() else None
 

@@ -150,13 +150,17 @@ def parse_8k_earnings(filings: dict, symbol: str) -> pd.DataFrame:
                          "accession": df["accessionNumber"]}).reset_index(drop=True)
 
 
-def update_earnings_8k(companies: pd.DataFrame, since: str = "2016-01-01", log=print) -> int:
+def update_earnings_8k(companies: pd.DataFrame, since: str = "2016-01-01", log=print, refresh: bool = False) -> int:
     """companies: rows with cik and symbol. Fetches older history pages back to `since`.
     Resumable: progress is saved every 100 companies, and companies already done are skipped;
     a network error skips that company (it's retried on the next run)."""
     state = _load_state()
     done = set(state.get("earnings_done", []))
-    todo = companies[~companies["cik"].astype(int).isin(done)]
+    if refresh:          # monthly: everyone again, recent filings only (history is already stored)
+        todo, done = companies, set()
+        since = "9999"
+    else:
+        todo = companies[~companies["cik"].astype(int).isin(done)]
     frames, failed, added = [], 0, 0
 
     def flush():

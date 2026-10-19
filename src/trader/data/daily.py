@@ -31,11 +31,22 @@ def alpaca_symbol(sec_symbol: str) -> str:
     return sec_symbol.replace("-", ".")   # SEC writes BRK-B, Alpaca BRK.B
 
 
-def update_daily_bars(symbols: list[str], start: str, end: str, secrets: AlpacaSecrets, log=print) -> int:
+def update_daily_bars(symbols: list[str], start: str, end: str, secrets: AlpacaSecrets, log=print,
+                      refresh: bool = False) -> int:
+    """New symbols get full history from `start`. With `refresh`, symbols we already have also get
+    their recent bars (from a few days before the newest stored bar)."""
     client = StockHistoricalDataClient(secrets.api_key, secrets.secret_key)
     have = read(daily_path())
     known = set(have["symbol"].unique()) if not have.empty else set()
-    todo = sorted({alpaca_symbol(s) for s in symbols} - known)
+    wanted = {alpaca_symbol(s) for s in symbols}
+    added = _fetch(client, sorted(wanted - known), start, end, log)
+    if refresh and known:
+        recent = (have["ts"].max() - pd.Timedelta(days=5)).strftime("%Y-%m-%d")
+        added += _fetch(client, sorted(wanted & known), recent, end, log)
+    return added
+
+
+def _fetch(client, todo: list[str], start: str, end: str, log) -> int:
     added = 0
     for i in range(0, len(todo), BATCH):
         batch = todo[i:i + BATCH]

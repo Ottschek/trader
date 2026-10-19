@@ -143,3 +143,11 @@ def test_r2_pull_skips_report_cards(tmp_path):
     s3.objects = {"bars/coinbase/BTC-USD.parquet": b"data", "reports/abc.html": b"<html>"}
     assert r2.pull("b", s3, tmp_path) == 1
     assert not (tmp_path / "reports").exists()
+
+
+def test_r2_pull_can_be_limited_to_folders(tmp_path):
+    s3 = FakeS3()
+    s3.objects = {"bars/coinbase/BTC-USD.parquet": b"a", "daily/stocks.parquet": b"big", "sec/state.json": b"{}"}
+    assert r2.pull("b", s3, tmp_path, prefixes=r2.COLLECTOR_PREFIXES) == 1
+    assert not (tmp_path / "daily").exists()
+    assert r2.pull("b", s3, tmp_path, prefixes=r2.RESEARCH_PREFIXES) == 2

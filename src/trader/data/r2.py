@@ -50,13 +50,19 @@ def local_files(root: Path) -> dict[str, Path]:
             if p.is_file() and p.suffix in SYNCED_SUFFIXES}
 
 
-def pull(bucket: str, s3=None, root: Path | None = None) -> int:
+COLLECTOR_PREFIXES = ("bars/", "funding/", "snapshots/", "corporate_actions/", "alt/", "checks/")
+RESEARCH_PREFIXES = ("sec/", "daily/")      # big research data, refreshed monthly
+
+
+def pull(bucket: str, s3=None, root: Path | None = None, prefixes: tuple[str, ...] | None = None) -> int:
     """Download every data file that is missing or different locally (report cards and
-    other non-data objects in the bucket are skipped)."""
+    other non-data objects in the bucket are skipped). `prefixes` limits it to some folders."""
     s3, root = s3 or client(), root or data_dir()
     n = 0
     for key, etag in remote_index(s3, bucket).items():
         if Path(key).suffix not in SYNCED_SUFFIXES:
+            continue
+        if prefixes is not None and not key.startswith(prefixes):
             continue
         path = root / key
         if path.exists() and _md5(path) == etag:
