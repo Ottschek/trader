@@ -297,6 +297,12 @@ insider and hype data, more crazy ideas — all through the same funnel.
   Workers plan refuses calls over the allowance instead of billing). Strict JSON-schema mode returned empty lists,
   so the model answers in plain JSON and must quote the start of each flagged headline: flags whose quote doesn't
   match the headline they point to are repaired (unique match) or dropped (Llama sometimes mixes up ids).
+- **agent_loop** (reel: "describe a strategy, backtest it, let an AI agent fix the losing trades"; designed and
+  committed before running): start "hold BTC/ETH while 30-day momentum > 0 and price > 100-day average", then 20
+  rounds where Llama 3.3 70B sees the 10 worst losing trades on 2016-2017 and rewrites the rule (Darwin's rule
+  language), kept only if the training Sharpe improves. No proposal ever beat the start (2.75 in-sample): it kept
+  adding filters that cut the winners along with the losers. The start rule then failed the six tests: OOS Sharpe
+  0.96 (BTC 0.68), timing p = 0.038, drawdown −55.2%, deflated 0.00; 21 rules counted as trials.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
