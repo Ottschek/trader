@@ -230,10 +230,14 @@ def collect_all(settings, now: pd.Timestamp, run) -> None:
         mark(state, "etf_flows", now)
     run("alt polymarket", update_polymarket, now, cfg.get("polymarket_top_n", 100))
     run("alt listings", update_listings, state, now)
+    news_cfg = getattr(settings, "news", None) or {}
+    if news_cfg.get("assets"):
+        from trader.data.news import update_headlines
+        run("alt news headlines", update_headlines, list(news_cfg["assets"]), now, news_cfg.get("yahoo_overrides"))
     save_state(state)
 
 
-ALT_STALENESS_HOURS = {"stablecoins": 72, "pageviews": 96, "etf_flows": 120, "polymarket": 3}
+ALT_STALENESS_HOURS = {"stablecoins": 72, "pageviews": 96, "etf_flows": 120, "polymarket": 3, "news_headlines": 6}
 
 
 def staleness_targets() -> dict[str, tuple[Path, float]]:

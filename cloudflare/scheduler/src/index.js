@@ -25,7 +25,7 @@ export function weeklyDue(date, env) {
 const fmtPct = (x, d = 2) => (x == null ? "n/a" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(d)}%`);
 
 export function formatWeekly({ now, timeZone, equityNow, equityWeekAgo, decisions, openTrade, halted, recon,
-                               runs, failingNow, oiCount, experiments, totalTrials, dashboard, carry = null }) {
+                               runs, failingNow, oiCount, experiments, totalTrials, dashboard, carry = null, news = null }) {
   const local = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "short", year: "numeric" }).format(now);
   const lines = [`🗓 <b>Weekly report</b> · week ending ${local}`, "", "🧪 <b>Shadow paper experiment</b> (not a validated candidate)"];
   if (equityNow != null) {
@@ -46,6 +46,13 @@ export function formatWeekly({ now, timeZone, equityNow, equityWeekAgo, decision
     lines.push(`Equity ${Math.round(carry.equity).toLocaleString("en")} USD (${fmtPct(carry.equity / 100000 - 1)} since start; ` +
                `model ${fmtPct(carry.model_equity / 100000 - 1)}) · ${carry.rebalances} margin rebalance(s)`);
   }
+  if (news && news.runs > 0) {
+    lines.push("", "📰 <b>LLM news analyst</b> (shadow, no real orders)");
+    lines.push(`This week: ${news.runs} run(s), ${news.signals} signal(s), $${news.cost.toFixed(2)} spent`);
+    lines.push(news.scored > 0
+      ? `All scored signals so far: ${news.scored}, avg 1-day net excess ${fmtPct(news.avgNet)}, ${Math.round(news.hitRate * 100)}% winners`
+      : "No signal scored yet (each needs 1 day of prices)");
+  }
   lines.push("", "📡 <b>Data</b>");
   const failedRuns = runs.filter((r) => r.status === "fail").length;
   lines.push(`Collector runs: ${runs.length} (${failedRuns} with failures) · open interest snapshots: ${oiCount}/1680`);
@@ -59,7 +66,7 @@ export function formatWeekly({ now, timeZone, equityNow, equityWeekAgo, decision
 
 async function sendWeekly(env, now) {
   const weekAgo = isoUtc(new Date(now.getTime() - 7 * 24 * HOUR));
-  const [eqNow, eqThen, decisions, state, recon, runs, latest, oi, experiments, trials, carry] = await env.DB.batch([
+  const [eqNow, eqThen, decisions, state, recon, runs, latest, oi, experiments, trials, carry, newsWeek, newsAll] = await env.DB.batch([
     env.DB.prepare("SELECT equity FROM paper_equity ORDER BY ts DESC LIMIT 1"),
     env.DB.prepare("SELECT equity FROM paper_equity WHERE ts <= ? ORDER BY ts DESC LIMIT 1").bind(weekAgo),
     env.DB.prepare("SELECT kind FROM paper_decisions WHERE decided_at >= ?").bind(weekAgo),
@@ -71,6 +78,8 @@ async function sendWeekly(env, now) {
     env.DB.prepare("SELECT verdict FROM experiments WHERE created_at >= ?").bind(weekAgo),
     env.DB.prepare("SELECT coalesce(sum(trials), 0) AS n FROM experiments"),
     env.DB.prepare("SELECT equity, model_equity, rebalances FROM carry_sim ORDER BY ts DESC LIMIT 1"),
+    env.DB.prepare("SELECT count(*) AS runs, coalesce(sum(signals), 0) AS signals, coalesce(sum(cost_usd), 0) AS cost FROM news_runs WHERE ts >= ?").bind(weekAgo),
+    env.DB.prepare("SELECT count(net_1d) AS scored, avg(net_1d) AS avg_net, avg(CASE WHEN net_1d > 0 THEN 1.0 ELSE 0.0 END) AS hit FROM news_signals WHERE net_1d IS NOT NULL"),
   ]);
   const st = Object.fromEntries(state.results.map((r) => [r.key, JSON.parse(r.value)]));
   const lastRun = latest.results[0]?.run_at;
@@ -83,6 +92,7 @@ async function sendWeekly(env, now) {
     recon: recon.results[0] ? JSON.parse(recon.results[0].summary) : null, runs: runs.results, failingNow,
     oiCount: oi.results[0].n, experiments: experiments.results, totalTrials: trials.results[0].n, dashboard: env.DASHBOARD_URL,
     carry: carry.results[0] ?? null,
+    news: { ...newsWeek.results[0], scored: newsAll.results[0].scored, avgNet: newsAll.results[0].avg_net, hitRate: newsAll.results[0].hit },
   }));
 }
 

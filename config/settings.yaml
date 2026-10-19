@@ -121,3 +121,44 @@ alt_data:
     SPY: [SPDR_S&P_500_Trust_ETF]
     QQQ: [Invesco_QQQ]
   polymarket_top_n: 100                     # hourly snapshot of the most-traded markets
+
+# LLM news analyst: forward-only SHADOW experiment (paper/news_analyst.py). Rules frozen on
+# 2026-10-19 before the first run; change them only by starting a new experiment.
+# Needs ANTHROPIC_API_KEY (.env locally, GitHub secret in the cloud); without it only the free
+# headline collection runs.
+news:
+  start: "2026-10-19"
+  every_hours: 6
+  model: claude-opus-5-5
+  effort: low
+  monthly_budget_usd: 5.0     # hard cap, paced evenly through the month
+  signal_threshold: 2         # |sum of impacts| for one asset in one run
+  yahoo_overrides: {}         # symbol -> Yahoo ticker, if the default (BTC/USD -> BTC-USD) is wrong
+  assets:
+    SPY: S&P 500 index ETF (US market)
+    QQQ: Nasdaq-100 index ETF (US tech)
+    IWM: Russell 2000 index ETF (US small caps)
+    TLT: 20+ year US Treasury bond ETF
+    GLD: gold ETF
+    AAPL: Apple
+    MSFT: Microsoft
+    NVDA: Nvidia
+    AMZN: Amazon
+    GOOGL: Alphabet (Google)
+    META: Meta Platforms
+    TSLA: Tesla
+    JPM: JPMorgan Chase
+    XOM: Exxon Mobil
+    COIN: Coinbase (crypto exchange stock)
+    MSTR: Strategy / MicroStrategy (bitcoin treasury stock)
+    MARA: MARA Holdings (bitcoin miner)
+    RIOT: Riot Platforms (bitcoin miner)
+    BTC/USD: Bitcoin
+    ETH/USD: Ethereum
+    SOL/USD: Solana
+    DOGE/USD: Dogecoin
+    LTC/USD: Litecoin
+    AVAX/USD: Avalanche
+    LINK/USD: Chainlink
+    AAVE/USD: Aave
+    BCH/USD: Bitcoin Cash

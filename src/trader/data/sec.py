@@ -25,7 +25,9 @@ import requests
 from trader.config import secret
 from trader.data.store import data_dir, upsert
 
-INSIDER_URL = "https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets/{y}q{q}_form345.zip"
+# The SEC moved newer quarters (2026q2 on) to a new folder; older ones stay at the old address.
+INSIDER_URLS = ("https://www.sec.gov/files/datastandardsinnovation/data/insider-transactions-data-sets/{y}q{q}_form345.zip",
+                "https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets/{y}q{q}_form345.zip")
 MIN_INTERVAL = 0.15   # seconds between requests (~6/s)
 _last_request = 0.0
 
@@ -117,7 +119,10 @@ def update_insider_purchases(today: pd.Timestamp, start_year: int = 2016, log=pr
         key = f"{y}q{q}"
         if key in done:
             continue
-        r = sec_get(INSIDER_URL.format(y=y, q=q))
+        for url in INSIDER_URLS:
+            r = sec_get(url.format(y=y, q=q))
+            if r.status_code != 404:
+                break
         if r.status_code == 404:
             log(f"  insider {key}: not published yet")
             continue

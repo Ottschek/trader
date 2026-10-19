@@ -170,6 +170,7 @@ def main() -> int:
                                "results": [r.to_dict() for r in results]}, indent=1))
 
     if args.cloud:
+        news_analyst(settings, now)
         report_to_cloud(settings, now, results, previous, added, time.time() - t0)
 
     print("\nChecks:")
@@ -239,6 +240,30 @@ def reconcile_paper(settings, now) -> None:
         print(f"Paper reconcile skipped: {type(e).__name__}: {e}")
 
 
+def news_analyst(settings, now) -> None:
+    """LLM news analyst shadow: analyze new headlines when due, then score past signals."""
+    from trader.paper import news_analyst as na
+
+    try:
+        print(f"News analyst: {na.run(settings, now)}")
+        scored = na.rescore(settings)
+        if len(scored):
+            s = na.summary(scored)
+            print(f"  {s['signals']} signals so far; 1-day net excess {s['1d']['mean_net']} over {s['1d']['n']} scored")
+    except Exception as e:  # noqa: BLE001 - never let the news experiment break data collection
+        print(f"News analyst skipped: {type(e).__name__}: {e}")
+
+
+def mirror_news(settings, now) -> None:
+    from trader.monitor.d1 import D1
+    from trader.paper import news_analyst as na
+
+    try:
+        na.mirror_to_d1(D1(settings.cloud.d1_database_id), now)
+    except Exception as e:  # noqa: BLE001
+        print(f"News analyst D1 mirror skipped: {type(e).__name__}: {e}")
+
+
 def report_to_cloud(settings, now, results, previous, added, duration_s) -> None:
     from trader.data import r2
     from trader.monitor import report, telegram
@@ -251,6 +276,7 @@ def report_to_cloud(settings, now, results, previous, added, duration_s) -> None
     sync_ledger_to_d1(settings)
     save_paper_plan(settings, now)
     reconcile_paper(settings, now)
+    mirror_news(settings, now)
     alert = report.failure_alert(results, previous)
     if alert:
         telegram.send(alert)

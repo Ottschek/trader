@@ -82,4 +82,18 @@ test("weekly report text", () => {
   assert.match(text, /Collector runs: 2 \(1 with failures\)/);
   assert.match(text, /All checks pass now/);
   assert.match(text, /29 trials in the ledger/);
+  assert.doesNotMatch(text, /news analyst/);
+});
+
+test("weekly report includes the news analyst once it has run", () => {
+  const base = {
+    now: at("2026-10-25T19:00:00Z"), timeZone: "Europe/Vienna", equityNow: null, equityWeekAgo: null,
+    decisions: [], openTrade: null, halted: null, recon: null, runs: [], failingNow: [], oiCount: 0,
+    experiments: [], totalTrials: 0, dashboard: "https://example.pages.dev",
+  };
+  const text = formatWeekly({ ...base, news: { runs: 28, signals: 5, cost: 1.234, scored: 4, avgNet: 0.0031, hitRate: 0.75 } });
+  assert.match(text, /28 run\(s\), 5 signal\(s\), \$1\.23 spent/);
+  assert.match(text, /4, avg 1-day net excess \+0\.31%, 75% winners/);
+  assert.match(formatWeekly({ ...base, news: { runs: 2, signals: 0, cost: 0.1, scored: 0, avgNet: null, hitRate: null } }),
+               /No signal scored yet/);
 });

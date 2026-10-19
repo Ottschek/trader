@@ -70,6 +70,7 @@ class Settings:
     cloud: CloudSettings | None = None
     validation: ValidationSettings | None = None
     alt_data: dict | None = None
+    news: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,7 @@ def load_settings(path: Path = DEFAULT_SETTINGS_PATH) -> Settings:
                                          for k, v in raw["validation"].items()})
         if "validation" in raw else None,
         alt_data=raw.get("alt_data"),
+        news=raw.get("news"),
     )
 
 

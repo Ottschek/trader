@@ -252,7 +252,22 @@ insider and hype data, more crazy ideas — all through the same funnel.
   rejected — Sharpe 0.42, p = 0.956 (no edge). Two runs before the clean one exposed real strategy bugs via the
   lookahead check (release cutoff at the bar's start instead of its close; unstable tie-break between
   simultaneous signals); both stay in the ledger.
-- Open: Hyperliquid testnet perps (need a testnet wallet), LLM news analyst (needs an API key with a spending cap).
+- **Carry simulation** (instead of the Hyperliquid testnet, which needs a real mainnet deposit): the Worker runs an
+  always-on cash-and-carry on $100k virtual since 2026-10-19 08:00 UTC: Alpaca spot at the real ask, Hyperliquid
+  perp at the real impact bid, real funding, both venues' fees, margin re-hedge at 80%. Shown next to the
+  backtest model so the reality gap (spreads, cross-venue basis) is visible.
+- **stablecoin_printer** (p = 0.585) and **attention_filter** (p = 0.735): rejected, no timing information.
+- **insider_cluster_sized** (same signals, 2% daily-volatility sizing): rejected — Sharpe −0.19; sizing cut the
+  drawdown (−36.6% vs −57.8%) but not the problem; timing p = 0.034.
+- **Monthly refresh** (GitHub Actions, 3rd of each month): new SEC insider quarters, recent 8-K releases and daily
+  prices; the hourly collector only pulls its own folders from R2. The SEC moved quarters from 2026q2 on to a new
+  folder; the downloader tries both.
+- **LLM news analyst** (forward-only shadow, rules frozen 2026-10-19): the collector stores Yahoo Finance headlines
+  for 27 assets every hour (free). Every 6 hours Claude (Opus 5.5, low effort, structured output) flags headlines
+  with an expected 1–5 day impact (−2..+2); per asset, |sum| ≥ 2 is a long/short signal, scored from the next
+  open against SPY/BTC after round-trip costs at 1 and 5 days. Spend capped at $5/month in code (paced evenly).
+  No backtest on purpose: the model would know what happened next. Runs once ANTHROPIC_API_KEY is set.
+- Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
 
