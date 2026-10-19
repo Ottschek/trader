@@ -317,6 +317,12 @@ insider and hype data, more crazy ideas — all through the same funnel.
   costs (it never trades after opening; real hedges need rebalancing and margin top-ups), cross-venue basis is
   only modelled from hourly data, and exchange/stablecoin failure risk isn't in any backtest. Next gate: the live
   carry simulation must track the model (Nov 19 review). No real money.
+- **The brain** (scripts/brain.py, weekly workflow): the free AI (Llama 3.3 70B) invents strategies in a fixed rule
+  language (strategies/brain.py: return, trend, volatility, RSI, volume, funding, BTC move, hour, weekday; no code);
+  it sees the graveyard and its earlier ideas first. Each idea runs the six tests (recorded trial); passing all six
+  triggers its one holdout look; Telegram reports who died and who survived. Two ideas a week, on purpose: every
+  idea raises the deflated-Sharpe bar. Ideas live in ledger/brain_ideas.jsonl; the workflow commits ledger/ back,
+  so pull before committing locally. First idea (funding_mean_reversion) died: Sharpe 0.29, timing p = 0.88.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog

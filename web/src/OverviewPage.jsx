@@ -142,6 +142,7 @@ function Overview({ health, lab, paper }) {
           <ul className="upcoming">
             <li><strong>Every Monday 09:00 New York</strong><span className="muted small">weekend-gap decision (trades only after a BTC weekend above +6%)</span></li>
             <li><strong>Every Sunday 20:00 Vienna</strong><span className="muted small">weekly report on Telegram</span></li>
+            <li><strong>Every Sunday 05:37 UTC</strong><span className="muted small">the brain: the free AI invents 2 strategies, the six tests decide which die</span></li>
             <li><strong>2 Nov</strong><span className="muted small">paper trading two weeks without a crash: milestone M5 done</span></li>
             <li><strong>3 Nov</strong><span className="muted small">monthly refresh of SEC filings and daily prices</span></li>
             <li><strong>19 Nov</strong><span className="muted small">one-month review: paper trade and carry simulation against their backtests</span></li>

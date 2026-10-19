@@ -1,0 +1,49 @@
+name: Brain (AI strategy ideas)
+
+# Every Sunday the free AI invents 2 strategies; the six tests decide which die. Results are
+# committed back to the repo (ledger/), so every idea stays counted as a trial.
+on:
+  schedule:
+    - cron: "37 5 * * 0"     # Sunday 05:37 UTC
+  workflow_dispatch:
+    inputs:
+      ideas:
+        description: "How many ideas"
+        default: "2"
+
+concurrency:
+  group: ledger-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write            # commits ledger/experiments.jsonl and ledger/brain_ideas.jsonl
+
+jobs:
+  brain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUNBUFFERED: "1"
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - run: python scripts/brain.py --ideas "${{ github.event.inputs.ideas || '2' }}" --cloud
+      - name: Commit the results
+        run: |
+          git config user.name "trader-brain"
+          git config user.email "trader-brain@users.noreply.github.com"
+          git add ledger/
+          if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
+          git commit -m "Brain: weekly AI strategy ideas tested (ledger)"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 10; done
+          exit 1
