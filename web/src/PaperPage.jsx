@@ -110,6 +110,52 @@ function LiveVsBacktest({ r }) {
   );
 }
 
+function CarrySim({ rows }) {
+  if (!rows || rows.length === 0) {
+    return (
+      <section className="card">
+        <div className="card-head"><h2>Carry simulation</h2><span className="muted">shadow · no real orders · no wallet</span></div>
+        <p className="muted">Starts with the next hourly run: long spot on Alpaca + short perp on Hyperliquid in 10 coins, $100,000 virtual.</p>
+      </section>
+    );
+  }
+  const first = rows[0], last = rows.at(-1);
+  const days = Math.max((Date.parse(last.ts) - Date.parse(first.ts)) / 86400000, 1 / 24);
+  const ret = last.equity / 100000 - 1, model = last.model_equity / 100000 - 1;
+  const annual = days >= 7 ? (1 + ret) ** (365 / days) - 1 : null;
+  const points = rows.map((r) => ({ ts: r.ts, equity: r.equity }));
+  const expected = rows.map((r) => [r.ts, r.model_equity]);
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>Carry simulation: cash-and-carry, always on</h2>
+        <span className="muted">shadow · no real orders · real prices from Alpaca and Hyperliquid · since {shortDate(first.ts)}</span>
+      </div>
+      <div className="mini-stats">
+        <div><span className="muted small">Simulated return</span><strong>{pct(ret, 2)}</strong></div>
+        <div><span className="muted small">Annualized</span><strong>{annual == null ? "after 7 days" : pct(annual, 1)}</strong></div>
+        <div><span className="muted small">Backtest model</span><strong>{pct(model, 2)}</strong></div>
+        <div><span className="muted small">Funding collected</span><strong>{usd(last.funding_cum)}</strong></div>
+        <div><span className="muted small">Fees paid · rebalances</span><strong>{usd(last.fees_cum)} · {last.rebalances}</strong></div>
+      </div>
+      <EquityChart points={points} expected={expected} />
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>Coin</th><th className="num">Perp vs spot (basis)</th><th className="num">Funding now (per year)</th></tr></thead>
+          <tbody>
+            {Object.keys(last.basis).map((c) => (
+              <tr key={c}><td>{c}</td><td className="num">{(last.basis[c] * 1e4).toFixed(1)} bps</td>
+                <td className="num">{pct(last.funding[c] * 24 * 365, 1)}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted small">Peak margin use {pct(last.max_margin_use, 0)} of a pair's 25% perp margin (pairs are re-hedged at 80%).
+        The model line is what the backtest formula predicts; the gap is the reality cost (spreads, cross-venue basis).</p>
+    </section>
+  );
+}
+
 function Plan({ plan }) {
   if (!plan) return null;
   return (
@@ -220,6 +266,7 @@ function Paper({ data }) {
         <EquityChart points={eq} expected={data.reconcile?.expected_curve} />
       </section>
       <LiveVsBacktest r={data.reconcile} />
+      <CarrySim rows={data.carry} />
       <Plan plan={data.plan} />
       <Decisions decisions={data.decisions} />
       <Orders orders={data.orders} />

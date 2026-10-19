@@ -1,5 +1,6 @@
 // Time-critical jobs on Cloudflare's clock. See wrangler.toml for the schedule.
 
+import { COINS as CARRY_COINS, initialState as carryInitial, priceSnapshot, step as carryStep } from "./carry.js";
 import { makeAlpaca, telegram as sendTelegram } from "./clients.js";
 import { equitySnapshot, handleCommand, isDecisionTime, morning, paperConfig, refreshOrders, riskCheck } from "./paper.js";
 import { makeStore } from "./store.js";
@@ -24,7 +25,7 @@ export function weeklyDue(date, env) {
 const fmtPct = (x, d = 2) => (x == null ? "n/a" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(d)}%`);
 
 export function formatWeekly({ now, timeZone, equityNow, equityWeekAgo, decisions, openTrade, halted, recon,
-                               runs, failingNow, oiCount, experiments, totalTrials, dashboard }) {
+                               runs, failingNow, oiCount, experiments, totalTrials, dashboard, carry = null }) {
   const local = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "short", year: "numeric" }).format(now);
   const lines = [`🗓 <b>Weekly report</b> · week ending ${local}`, "", "🧪 <b>Shadow paper experiment</b> (not a validated candidate)"];
   if (equityNow != null) {
@@ -40,6 +41,11 @@ export function formatWeekly({ now, timeZone, equityNow, equityWeekAgo, decision
     lines.push(`Live vs backtest: tracking ${fmtPct(recon.tracking_difference)}, ${recon.mismatches.length} decision mismatch(es)` +
                (recon.avg_slippage_bps != null ? `, avg fill vs open ${recon.avg_slippage_bps} bps` : ""));
   }
+  if (carry) {
+    lines.push("", "🧮 <b>Carry simulation</b> (shadow, no real orders)");
+    lines.push(`Equity ${Math.round(carry.equity).toLocaleString("en")} USD (${fmtPct(carry.equity / 100000 - 1)} since start; ` +
+               `model ${fmtPct(carry.model_equity / 100000 - 1)}) · ${carry.rebalances} margin rebalance(s)`);
+  }
   lines.push("", "📡 <b>Data</b>");
   const failedRuns = runs.filter((r) => r.status === "fail").length;
   lines.push(`Collector runs: ${runs.length} (${failedRuns} with failures) · open interest snapshots: ${oiCount}/1680`);
@@ -53,7 +59,7 @@ export function formatWeekly({ now, timeZone, equityNow, equityWeekAgo, decision
 
 async function sendWeekly(env, now) {
   const weekAgo = isoUtc(new Date(now.getTime() - 7 * 24 * HOUR));
-  const [eqNow, eqThen, decisions, state, recon, runs, latest, oi, experiments, trials] = await env.DB.batch([
+  const [eqNow, eqThen, decisions, state, recon, runs, latest, oi, experiments, trials, carry] = await env.DB.batch([
     env.DB.prepare("SELECT equity FROM paper_equity ORDER BY ts DESC LIMIT 1"),
     env.DB.prepare("SELECT equity FROM paper_equity WHERE ts <= ? ORDER BY ts DESC LIMIT 1").bind(weekAgo),
     env.DB.prepare("SELECT kind FROM paper_decisions WHERE decided_at >= ?").bind(weekAgo),
@@ -64,6 +70,7 @@ async function sendWeekly(env, now) {
     env.DB.prepare("SELECT count(*) AS n FROM oi_snapshots WHERE ts >= ?").bind(weekAgo),
     env.DB.prepare("SELECT verdict FROM experiments WHERE created_at >= ?").bind(weekAgo),
     env.DB.prepare("SELECT coalesce(sum(trials), 0) AS n FROM experiments"),
+    env.DB.prepare("SELECT equity, model_equity, rebalances FROM carry_sim ORDER BY ts DESC LIMIT 1"),
   ]);
   const st = Object.fromEntries(state.results.map((r) => [r.key, JSON.parse(r.value)]));
   const lastRun = latest.results[0]?.run_at;
@@ -75,6 +82,7 @@ async function sendWeekly(env, now) {
     decisions: decisions.results, openTrade: st.open_trade ?? null, halted: st.halted ?? null,
     recon: recon.results[0] ? JSON.parse(recon.results[0].summary) : null, runs: runs.results, failingNow,
     oiCount: oi.results[0].n, experiments: experiments.results, totalTrials: trials.results[0].n, dashboard: env.DASHBOARD_URL,
+    carry: carry.results[0] ?? null,
   }));
 }
 
@@ -115,7 +123,44 @@ async function recordSnapshot(env, now) {
   await env.DB.batch(rows.map((r) => stmt.bind(
     r.ts, r.taken_at, r.coin, r.open_interest, r.funding_rate, r.premium, r.mark_px, r.oracle_px, r.day_notional_volume,
   )));
+  try {
+    await carryTick(env, hour, meta, ctxs);      // reuse the same Hyperliquid data for the carry simulation
+  } catch (err) {
+    await telegram(env, `🚨 Carry simulation tick failed: ${escapeHtml(err.message)}`).catch(() => {});
+  }
   return rows.length;
+}
+
+/** One hour of the carry shadow simulation (no real orders): see src/carry.js. */
+async function carryTick(env, hour, meta, ctxs) {
+  const symbols = CARRY_COINS.map((c) => `${c}/USD`).join(",");
+  const q = await fetch(`https://data.alpaca.markets/v1beta3/crypto/us/latest/quotes?symbols=${encodeURIComponent(symbols)}`);
+  if (!q.ok) throw new Error(`Alpaca quotes answered ${q.status}`);
+  const prices = priceSnapshot((await q.json()).quotes || {}, meta, ctxs);
+  if (Object.keys(prices).length < CARRY_COINS.length / 2) throw new Error("too few coins priced");
+  const stored = await env.DB.prepare("SELECT value FROM scheduler_state WHERE key = 'carry_sim'").first("value");
+  const state = stored ? JSON.parse(stored) : carryInitial();
+  if (stored && state.lastHour === isoUtc(hour)) return;            // already ran this hour
+  const r = carryStep(state, prices);
+  r.state.lastHour = isoUtc(hour);
+  await env.DB.batch([
+    env.DB.prepare("INSERT OR REPLACE INTO scheduler_state (key, value, updated_at) VALUES ('carry_sim', ?, ?)")
+      .bind(JSON.stringify(r.state), isoUtc(hour)),
+    env.DB.prepare("INSERT OR REPLACE INTO carry_sim (ts, equity, model_equity, funding_cum, fees_cum, rebalances, " +
+                   "max_margin_use, basis, funding) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(isoUtc(hour), r.equity, r.state.modelEquity, r.state.fundingCum, r.state.feesCum, r.state.rebalances || 0,
+            r.state.maxMarginUse || 0, JSON.stringify(r.basis),
+            JSON.stringify(Object.fromEntries(Object.entries(prices).map(([c, p]) => [c, p.funding])))),
+  ]);
+  for (const e of r.events) {
+    if (e.kind === "opened") {
+      await telegram(env, `🧮 <b>Carry simulation started</b> (shadow, no real orders): long spot on Alpaca + short perp on ` +
+                          `Hyperliquid in ${e.coins.length} coins, $100,000 virtual. Results: ${env.DASHBOARD_URL}/#/paper`);
+    } else if (e.kind === "rebalanced") {
+      await telegram(env, `🧮 Carry simulation: ${e.coin} pump used ${(e.marginUse * 100).toFixed(0)}% of its perp margin; ` +
+                          "pair closed and reopened at current prices (fees paid again).");
+    }
+  }
 }
 
 // --- watchdog --------------------------------------------------------------------
