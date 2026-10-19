@@ -242,9 +242,17 @@ insider and hype data, more crazy ideas — all through the same funnel.
 - **combo_sleeves** (weekend gap + SPY regime + crypto trend): rejected — OOS Sharpe 0.84, drawdown −28.8%.
 - **Darwin** (genetic algorithm, 2000 genomes bred on 2016–2017, all counted as trials): in-sample Sharpe 4.20 →
   out-of-sample 0.89, drawdown −60.6%, deflated Sharpe 0.02 → rejected. The textbook overfitting demonstration.
-- Open: insider clusters & post-earnings drift (need SEC contact email), Hyperliquid testnet perps (need a
-  testnet wallet), LLM news analyst (needs an API key with a spending cap); consider counting *effective*
-  (independent) trials so Darwin's 2000 correlated genomes don't overstate the multiple-testing penalty.
+- **Effective trials** (decided before the SEC results): the deflated Sharpe counts N_eff = ρ + (1 − ρ)·N per
+  batch. Darwin's ρ was measured on a sample of all 2000 genomes it evaluated (0.77 → 464), not its converged
+  survivors (0.99 → 18, too lenient). Ledger: ~2050 raw → ~486 effective trials.
+- **Insider clusters** (275,520 SEC Form 4 purchases 2016–2026, 8,111 stocks, daily prices for 90% of purchases):
+  rejected — OOS Sharpe 0.33 vs SPY 0.76, drawdown −57.8%, but timing p = 0.002 (real information, not enough
+  return after small-cap costs and crashes).
+- **Post-earnings drift** (67,194 8-K item 2.02 releases, 1,159 companies; survivorship-biased universe):
+  rejected — Sharpe 0.42, p = 0.956 (no edge). Two runs before the clean one exposed real strategy bugs via the
+  lookahead check (release cutoff at the bar's start instead of its close; unstable tie-break between
+  simultaneous signals); both stay in the ledger.
+- Open: Hyperliquid testnet perps (need a testnet wallet), LLM news analyst (needs an API key with a spending cap).
 
 ## Idea backlog
 
