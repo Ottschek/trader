@@ -250,3 +250,30 @@ def test_attention_filter_steps_aside_after_a_hype_spike():
     assert out.min() >= pd.Timestamp("2023-04-03", tz="UTC")               # spike known 2 days after it starts
     assert w.loc["2023-03-15"].min() == 1.0 and w.loc["2023-06-01"].min() == 1.0
     assert check_no_lookahead(strat, data) == []
+
+
+def test_overnight_hold_owns_the_close_to_open_only():
+    import numpy as np
+    import pandas as pd
+
+    from trader.backtest.data import MarketData
+    from trader.backtest.engine import run_backtest
+    from trader.backtest.lookahead import check_no_lookahead
+    from trader.strategies.overnight import OvernightHold
+    times = [pd.Timestamp(f"{d} {h}", tz="America/New_York") for d in pd.bdate_range("2024-01-02", periods=6).date
+             for h in ("09:30", "10:30", "11:30", "12:30", "13:30", "14:30", "15:30")]
+    idx = pd.DatetimeIndex(times).tz_convert("UTC")
+    local = idx.tz_convert("America/New_York").strftime("%H:%M")
+    gap = pd.DataFrame({"SPY": np.where(local == "09:30", 0.01, 0.0)}, index=idx)      # +1% every night
+    intra = pd.DataFrame({"SPY": -0.001}, index=idx)                                    # -0.1% every hour of the day
+    close = (1 + gap).cumprod() * (1 + intra).cumprod() * 100
+    data = MarketData(close=close, open=close, volume=close * 0 + 1e6, gap=gap, intra=intra,
+                      tradable=close.notna(), venue={"SPY": "alpaca_stocks"}, raw_close=close)
+    w = OvernightHold(["SPY"], exit_after_bars=1).target_weights(data)["SPY"]
+    assert set(w[local == "14:30"]) == {1.0} and set(w[local == "09:30"][1:]) == {0.0}
+    r = run_backtest(data, w.to_frame(), {"SPY": 0.0})
+    held = r.weights["SPY"]
+    assert (held[local == "12:30"] == 0).all() and (held[local == "15:30"][:-1] > 0).all()
+    hold = run_backtest(data, pd.DataFrame({"SPY": 1.0}, index=idx), {"SPY": 0.0})
+    assert r.equity.iloc[-1] > hold.equity.iloc[-1]          # owning only nights beats owning all day here
+    assert check_no_lookahead(OvernightHold(["SPY"], exit_after_bars=2), data) == []
