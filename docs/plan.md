@@ -288,6 +288,10 @@ insider and hype data, more crazy ideas — all through the same funnel.
   workflow downloads a fresh daily window for the whole universe (one download, so splits can't create fake jumps),
   runs the committed strategy with the walk-forward's latest parameters (20-day lookback, 50 a side) and stores
   equity and weekly books in D1. Shown on the Paper tab against the backtest's 17.4% a year.
+- **overnight_hold** (idea from a reel; designed and committed before testing): SPY/QQQ from the 15:30 bar to 10:30
+  or 11:30 next day. Rejected: Sharpe −0.32, −6.7% a year, drawdown −47.5%. Costs were 20.1% a year (trading twice
+  a day at 4 bps each way), so before costs it earned roughly +13% a year: the overnight effect is real, the cost
+  of harvesting it daily is the problem. Whether 4 bps is too pessimistic for SPY can only be settled by real fills.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
