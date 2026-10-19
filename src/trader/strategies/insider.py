@@ -83,7 +83,7 @@ class InsiderCluster(Strategy):
         col = {s: i for i, s in enumerate(data.close.columns)}
         w = np.zeros(data.close.shape)
         open_until = []                                   # exit row of each open position
-        for sig in signals.sort_values("signal_date").itertuples(index=False):
+        for sig in signals.sort_values(["signal_date", "symbol"], kind="stable").itertuples(index=False):
             row = int(days.searchsorted(pd.Timestamp(sig.signal_date)))   # bar of the filing date (or next trading day)
             if row >= len(days):
                 continue                                  # filed after the data ends

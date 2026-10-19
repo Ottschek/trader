@@ -103,3 +103,23 @@ def test_earnings_release_on_the_last_bar_day_is_seen_consistently():
     events = pd.DataFrame({"symbol": "WIN", "accepted": acc, "accession": [str(i) for i in range(len(acc))]})
     strat = EarningsDrift(["WIN", "SPY"], threshold=0.05, hold_days=3, events=events)
     assert check_no_lookahead(strat, data, n_cuts=40) == []
+
+
+def test_simultaneous_signals_fill_the_last_slot_deterministically():
+    write_daily(["AAA", "BBB", "SPY"], days=80)
+    data = load_daily(["AAA", "BBB", "SPY"])
+    ts = pd.Timestamp("2023-03-01 07:00", tz="America/New_York").tz_convert("UTC")
+    df = pd.read_parquet(daily_path())
+    day = pd.Timestamp("2023-03-01 00:00", tz="America/New_York").tz_convert("UTC")
+    df.loc[df["symbol"].isin(["AAA", "BBB"]) & (df["ts"] >= day), ["open", "high", "low", "close"]] *= 1.10
+    df.to_parquet(daily_path(), index=False)
+    data = load_daily(["AAA", "BBB", "SPY"])
+    events = pd.DataFrame({"symbol": ["BBB", "AAA"], "accepted": [ts, ts], "accession": ["b", "a"]})   # identical times
+    strat = EarningsDrift(["AAA", "BBB", "SPY"], threshold=0.05, hold_days=10, events=events)
+    strat.MAX_POSITIONS = 1
+    w = strat.target_weights(data)
+    assert w["AAA"].sum() > 0 and w["BBB"].sum() == 0          # ties go alphabetically, every time
+    reversed_events = events.iloc[::-1].reset_index(drop=True)
+    w2 = EarningsDrift(["AAA", "BBB", "SPY"], threshold=0.05, hold_days=10, events=reversed_events)
+    w2.MAX_POSITIONS = 1
+    assert w2.target_weights(data).equals(w)

@@ -72,7 +72,7 @@ class EarningsDrift(Strategy):
         # a daily bar carries information up to that day's close, so releases accepted before the
         # last bar's close are known when deciding on it (bar timestamps are the day's midnight)
         known_until = data.index[-1] + pd.Timedelta(days=1)
-        events = events[events["symbol"].isin(tradable) & (events["accepted"] < known_until)].sort_values("accepted")
+        events = events[events["symbol"].isin(tradable) & (events["accepted"] < known_until)].sort_values(["accepted", "symbol"], kind="stable")
         bar_days = pd.DatetimeIndex(data.index.tz_convert(NY).tz_localize(None).normalize())
         rows = reaction_rows(events["accepted"], bar_days)
         bar_ret = (1 + data.gap) * (1 + data.intra) - 1           # close-to-close return per bar
