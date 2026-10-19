@@ -244,8 +244,10 @@ def news_analyst(settings, now) -> None:
     """News shadows: the LLM analyst (needs a key) and the free word-list score, then score past signals."""
     from trader.paper import news_analyst as na
     from trader.paper import news_lexicon as lex
+    from trader.paper import news_llama as llama
 
-    for label, step, path in (("News analyst", na.run, na.signals_path()), ("News word list", lex.run, lex.signals_path())):
+    for label, step, path in (("News analyst", na.run, na.signals_path()), ("News word list", lex.run, lex.signals_path()),
+                              ("News free AI (Llama)", llama.run, llama.signals_path())):
         try:
             print(f"{label}: {step(settings, now)}")
             scored = na.rescore(settings, path=path)

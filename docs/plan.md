@@ -292,6 +292,11 @@ insider and hype data, more crazy ideas — all through the same funnel.
   or 11:30 next day. Rejected: Sharpe −0.32, −6.7% a year, drawdown −47.5%. Costs were 20.1% a year (trading twice
   a day at 4 bps each way), so before costs it earned roughly +13% a year: the overnight effect is real, the cost
   of harvesting it daily is the problem. Whether 4 bps is too pessimistic for SPY can only be settled by real fills.
+- **Free AI news scorer** (forward shadow, rules frozen 2026-10-19): the LLM analyst's prompt and signal rules run
+  on Cloudflare Workers AI (Llama 3.3 70B) every 6 hours, ~165 of the free 10,000 daily neurons per run (the free
+  Workers plan refuses calls over the allowance instead of billing). Strict JSON-schema mode returned empty lists,
+  so the model answers in plain JSON and must quote the start of each flagged headline: flags whose quote doesn't
+  match the headline they point to are repaired (unique match) or dropped (Llama sometimes mixes up ids).
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog

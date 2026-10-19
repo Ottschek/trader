@@ -47,6 +47,7 @@ export function overview(health, lab, paper, now = Date.now()) {
   const revWeeks = (paper.reversal?.weeks ?? []).filter((w) => w.complete).length;
   const signals = paper.news?.signals ?? [];
   const lex = signals.filter((s) => s.source === "lexicon");
+  const llama = signals.filter((s) => s.source === "llama");
   const llmRuns = paper.news?.runs ?? [];
 
   return {
@@ -56,7 +57,8 @@ export function overview(health, lab, paper, now = Date.now()) {
              open: paper.state.open_trade ?? null, halted: paper.state.halted ?? null },
     reversal: { ret: revEq.length ? revEq.at(-1).equity - 1 : null, weeks: revWeeks },
     carry: carry && { ret: carry.equity / 100000 - 1, model: carry.model_equity / 100000 - 1, since: paper.carry[0].ts },
-    news: { lex: lex.length, lexScored: lex.filter((s) => s.net_1d != null).length, lexAvg: avg(lex.map((s) => s.net_1d)),
+    news: { llama: llama.length, llamaScored: llama.filter((s) => s.net_1d != null).length, llamaAvg: avg(llama.map((s) => s.net_1d)),
+            lex: lex.length, lexScored: lex.filter((s) => s.net_1d != null).length, lexAvg: avg(lex.map((s) => s.net_1d)),
             llmOn: llmRuns.length > 0 },
   };
 }
@@ -70,7 +72,7 @@ function Overview({ health, lab, paper }) {
     <>
       <section className="card overview-banner">
         <h2>Research only, no real money</h2>
-        <p className="muted">{verdict} Meanwhile four shadow experiments collect forward evidence with fake money.</p>
+        <p className="muted">{verdict} Meanwhile five shadow experiments collect forward evidence with fake money.</p>
       </section>
 
       <div className="tiles tiles-5">
@@ -106,6 +108,9 @@ function Overview({ health, lab, paper }) {
               <tr><td className="exp-name">News word list<span className="muted small">since 19 Oct 2026</span></td>
                 <td className="small">News-event words in headlines, 27 assets, every 6 hours</td>
                 <td className="num">{o.news.lex} signal(s)<span className="muted small">{o.news.lexScored ? ` · 1-day ${pct(o.news.lexAvg, 2)}` : ""}</span></td></tr>
+              <tr><td className="exp-name">Free AI news (Llama)<span className="muted small">since 19 Oct 2026</span></td>
+                <td className="small">Llama 3.3 70B on Cloudflare's free allowance reads the same headlines</td>
+                <td className="num">{o.news.llama} signal(s)<span className="muted small">{o.news.llamaScored ? ` · 1-day ${pct(o.news.llamaAvg, 2)}` : ""}</span></td></tr>
               <tr><td className="exp-name muted">LLM news analyst<span className="small">no API key</span></td>
                 <td className="small muted">Claude reads the same headlines</td>
                 <td className="num muted">{o.news.llmOn ? "running" : "off"}</td></tr>

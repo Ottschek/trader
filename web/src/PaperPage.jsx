@@ -177,7 +177,8 @@ function SourceStats({ label, signals, extra }) {
 
 function NewsSignals({ news }) {
   const runs = news?.runs ?? [], signals = news?.signals ?? [];
-  const lexicon = signals.filter((s) => s.source === "lexicon"), claude = signals.filter((s) => s.source !== "lexicon");
+  const lexicon = signals.filter((s) => s.source === "lexicon"), llama = signals.filter((s) => s.source === "llama");
+  const claude = signals.filter((s) => s.source === "claude");
   const month = new Date().toISOString().slice(0, 7);
   const spent = runs.filter((r) => r.ts.startsWith(month)).reduce((a, r) => a + r.cost_usd, 0);
   return (
@@ -187,6 +188,7 @@ function NewsSignals({ news }) {
         <span className="muted">shadow · no real orders · Yahoo Finance headlines, scored every 6 hours</span>
       </div>
       <SourceStats label="Word list (free)" signals={lexicon} />
+      <SourceStats label="Llama 3.3 70B (free AI)" signals={llama} />
       {runs.length > 0
         ? <SourceStats label="LLM analyst (Claude)" signals={claude}
             extra={<div><span className="muted small">Spent this month</span><strong>${spent.toFixed(2)}</strong><span className="muted small">of $5.00</span></div>} />
@@ -201,12 +203,12 @@ function NewsSignals({ news }) {
               {signals.slice(0, 30).map((s) => (
                 <tr key={s.id}>
                   <td>{shortDateTime(s.decided_at)}</td>
-                  <td>{s.source === "lexicon" ? "Word list" : "Claude"}</td>
+                  <td>{{ lexicon: "Word list", llama: "Llama" }[s.source] ?? "Claude"}</td>
                   <td>{s.symbol}</td>
                   <td><StatusBadge status={s.side > 0 ? "ok" : "fail"}>{s.side > 0 ? "Long" : "Short"} {s.score > 0 ? "+" : ""}{s.score}</StatusBadge></td>
                   <td className="small">{s.headlines.map((h, i) => (
                     <div key={i}><a href={h.link} target="_blank" rel="noreferrer">{h.title}</a>
-                      <span className="muted"> · {h.impact > 0 ? "+" : ""}{h.impact}{h.reason !== "word list" ? ` ${h.reason}` : ""}</span></div>
+                      <span className="muted"> · {h.impact > 0 ? "+" : ""}{h.impact}{h.reason && h.reason !== "word list" ? ` ${h.reason}` : ""}</span></div>
                   ))}</td>
                   <td className="num">{s.net_1d == null ? "pending" : pct(s.net_1d, 2)}</td>
                   <td className="num">{s.net_5d == null ? "pending" : pct(s.net_5d, 2)}</td>

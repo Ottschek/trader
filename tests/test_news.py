@@ -190,3 +190,53 @@ def test_d1_mirror_labels_each_signal_with_its_source():
     signals = [dict(zip(cols, r)) for t, cols, rows in inserted if t == "news_signals" for r in rows]
     assert {(s["id"], s["source"]) for s in signals} == {("x", "claude"), ("lex-x", "lexicon")}
     assert signals[0]["entry_ts"] is None and signals[0]["decided_at"].startswith("2026-10-19T12:07")
+
+
+# --- free AI (Workers AI Llama) -------------------------------------------------------------
+
+from trader.paper import news_llama as llama   # noqa: E402
+
+
+class FakeResponse:
+    def __init__(self, payload, status=200):
+        self.status_code, self._payload = status, payload
+
+    def json(self):
+        return self._payload
+
+
+def test_llama_flags_are_kept_only_when_the_quote_matches_and_ids_get_repaired(monkeypatch):
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "acct")
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "tok")
+    rows = headline_rows()            # 0 "Nvidia wins contract", 1 "Nvidia beats", 2 "BTC ETF outflows"
+    raw = {"flags": [
+        {"id": 0, "quote": "Nvidia wins contract", "symbol": "NVDA", "impact": 2, "reason": "ok"},
+        {"id": 0, "quote": "BTC ETF outflows", "symbol": "BTC/USD", "impact": -1, "reason": "wrong id, fixable"},
+        {"id": 1, "quote": "Something else entirely", "symbol": "NVDA", "impact": 1, "reason": "no match"},
+        {"id": 1, "quote": "Nvidia beats", "symbol": "XYZ", "impact": 1, "reason": "unknown asset"}]}
+    text = "Here you go:\n" + json.dumps(raw)
+    calls = []
+
+    def post(url, **kw):
+        calls.append((url, kw))
+        return FakeResponse({"result": {"response": text, "usage": {"neurons": 150.0}}})
+    out = llama.ask_llama(CFG, rows, NOW, post)
+    assert out["status"] == "ok" and out["dropped"] == 2 and out["usage"] == 150.0
+    assert [(f["id"], f["symbol"]) for f in out["flags"]] == [(0, "NVDA"), (2, "BTC/USD")]
+    assert calls[0][0].endswith("/accounts/acct/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast")
+    chat = FakeResponse({"result": {"choices": [{"message": {"content": text}}]}})
+    assert llama.ask_llama(CFG, rows, NOW, lambda url, **kw: chat)["status"] == "ok"
+    assert llama.ask_llama(CFG, rows, NOW, lambda url, **kw: FakeResponse({}, 429))["status"] == "HTTP 429"
+    assert llama.ask_llama(CFG, rows, NOW, lambda url, **kw: FakeResponse({"result": {"response": "no json"}}))["status"] == "bad json"
+
+
+def test_llama_run_keeps_headlines_queued_when_the_call_fails(monkeypatch):
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "acct")
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "tok")
+    settings = SimpleNamespace(news=CFG)
+    upsert(news.headlines_path(), headline_rows(), key=["guid"])
+    assert llama.run(settings, NOW, lambda url, **kw: FakeResponse({}, 500)).startswith("failed (HTTP 500)")
+    assert "news_llama" not in alt.load_state() or "cutoff" not in alt.load_state()["news_llama"]
+    good = {"flags": [{"id": 0, "quote": "Nvidia wins contract", "symbol": "NVDA", "impact": 2, "reason": "r"}]}
+    msg = llama.run(settings, NOW, lambda url, **kw: FakeResponse({"result": {"response": json.dumps(good)}}))
+    assert "long NVDA (+2)" in msg and read(llama.signals_path())["id"].str.startswith("llama-").all()

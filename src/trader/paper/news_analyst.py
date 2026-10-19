@@ -335,7 +335,8 @@ def mirror_to_d1(d1, now: pd.Timestamp, days: int = 10) -> int:
         runs = runs[runs["ts"] >= since]
         n += d1.insert_many("news_runs", RUN_COLUMNS, [tuple(_value(r[c]) for c in RUN_COLUMNS) for _, r in runs.iterrows()])
     from trader.paper.news_lexicon import signals_path as lexicon_path
-    for source, path in (("claude", signals_path()), ("lexicon", lexicon_path())):
+    from trader.paper.news_llama import signals_path as llama_path
+    for source, path in (("claude", signals_path()), ("lexicon", lexicon_path()), ("llama", llama_path())):
         signals = read(path)
         if signals.empty:
             continue
