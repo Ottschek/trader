@@ -306,6 +306,17 @@ insider and hype data, more crazy ideas — all through the same funnel.
 - **turn_of_month** (reel on "who is forced to trade"; designed and committed before testing): SPY/QQQ/IWM from the
   last 1-2 trading days of a month to the 2nd-3rd of the next, NYSE holiday calendar (known in advance). Rejected:
   OOS Sharpe 0.00, timing p = 0.804. The effect documented in 1987-2008 studies isn't there in 2018-2024.
+- **Test 5 for always-invested strategies** (committed before use): shuffling timing means nothing for a strategy
+  that is always in the market, so strategies declare `always_on` by design and test 5 becomes "return above zero"
+  (daily returns demeaned, resampled in 5-day blocks). Note: funding_harvest was NOT unfairly rejected: it does
+  time its entries, and its timing was worse than random (p = 0.994).
+- **carry_always_on: FIRST CANDIDATE, HOLDOUT PASSED.** Every carry pair all the time (what the carry simulation
+  runs), designed after funding_harvest's timing failed. Research (2023-05 to 2024-10, 0.93 years out of sample):
+  23.7% a year, Sharpe 25.4, drawdown −0.3%, p = 0.002, deflated 1.00. One holdout look (2024-10-18 to 2026-10-19,
+  2 years): 8.7% a year, Sharpe 16.8, drawdown −0.3% (BTC: 10.3%, −54%). Caveats: the backtest charges almost no
+  costs (it never trades after opening; real hedges need rebalancing and margin top-ups), cross-venue basis is
+  only modelled from hourly data, and exchange/stablecoin failure risk isn't in any backtest. Next gate: the live
+  carry simulation must track the model (Nov 19 review). No real money.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
