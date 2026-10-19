@@ -87,6 +87,8 @@ class InsiderCluster(Strategy):
             row = int(days.searchsorted(pd.Timestamp(sig.signal_date)))   # bar of the filing date (or next trading day)
             if row >= len(days):
                 continue                                  # filed after the data ends
+            if not self.accept(data, col[sig.symbol], row):
+                continue                                  # filtered out before it takes a portfolio slot
             open_until = [r for r in open_until if r > row]
             if len(open_until) >= self.MAX_POSITIONS:
                 continue                                  # portfolio full: skip, as a real trader would
@@ -94,6 +96,9 @@ class InsiderCluster(Strategy):
             w[row:end, col[sig.symbol]] = self.position_size(data, col[sig.symbol], row)
             open_until.append(end)
         return pd.DataFrame(w, index=data.index, columns=data.close.columns)[tradable]
+
+    def accept(self, data: MarketData, column: int, row: int) -> bool:
+        return True
 
     def position_size(self, data: MarketData, column: int, row: int) -> float:
         return self.POSITION
@@ -115,3 +120,24 @@ class InsiderClusterSized(InsiderCluster):
         if not np.isfinite(vol) or vol <= 0:
             return 0.0                    # not enough history to size the position: skip it
         return self.POSITION * min(1.0, self.TARGET_VOL / vol)
+
+
+class InsiderClusterLarge(InsiderCluster):
+    """Insider clusters in liquid stocks only (designed 2026-10-19, before any test, after
+    insider_cluster showed timing information (p = 0.002) but lost to small-cap costs and crashes).
+
+    A signal counts only if the stock's average daily dollar volume over the last 20 trading days
+    (up to the filing date's close, known before the next open) is at least MIN_DOLLAR_VOLUME.
+    Trades pay the large-cap cost profile instead of the small-cap one. Same signals, grid,
+    position size and portfolio limits as insider_cluster."""
+    name = "insider_cluster_large"
+    MIN_DOLLAR_VOLUME = 50e6
+    cost_venue = "alpaca_largecaps"
+
+    def accept(self, data: MarketData, column: int, row: int) -> bool:
+        if not hasattr(self, "_adv") or self._adv_data is not data:
+            dollar = (data.raw_close * data.volume).where(data.tradable)
+            self._adv = dollar.rolling(20, min_periods=15).mean().to_numpy()
+            self._adv_data = data
+        adv = self._adv[row, column]
+        return bool(np.isfinite(adv) and adv >= self.MIN_DOLLAR_VOLUME)

@@ -3,6 +3,7 @@
 #   - record Hyperliquid open interest every hour (it can't be downloaded later)
 #   - send the daily Telegram summaries at 08:00 and 22:30 Vienna time
 #   - watchdog: Telegram alert if the GitHub collector hasn't run for too long
+#   - kick: start the GitHub collector itself when GitHub skips its schedule (needs GITHUB_DISPATCH_TOKEN)
 # Bulk price collection stays in GitHub Actions; late runs simply catch up.
 name = "trader-scheduler"
 main = "src/index.js"
@@ -27,6 +28,7 @@ SUMMARY_TIMES = "08:00,22:30"
 WEEKLY_REPORT = "Sun 20:00"
 MAX_COLLECTOR_LAG_HOURS = "6"
 DASHBOARD_URL = "https://trader-web-6t6.pages.dev"
+GITHUB_REPO = "Ottschek/trader"
 
 # Paper trading: SHADOW EXPERIMENT. Must match config/paper.yaml (tests/test_paper.py checks this).
 PAPER_EXPERIMENT = "shadow-weekend-gap-sized-1"
@@ -42,3 +44,4 @@ RISK_KILL_DRAWDOWN = "0.15"
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 #   ALPACA_API_KEY, ALPACA_SECRET_KEY   paper keys only (the code refuses anything not starting with PK)
 #   TELEGRAM_WEBHOOK_SECRET             random; also passed to Telegram's setWebhook
+#   GITHUB_DISPATCH_TOKEN               fine-grained GitHub token: this repo only, Actions read/write

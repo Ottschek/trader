@@ -135,7 +135,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
         bench = bench + SPOT_SUFFIX          # the rule's benchmark is holding the coin itself, not its carry pair
     if data.index.max() >= pd.Timestamp(v.holdout_start, tz="UTC"):
         raise ho.HoldoutLocked("research data must end before the holdout")
-    costs = cost_bps(data, settings)
+    costs = cost_bps(data, settings, strategy_cls.cost_venue)
     combos = param_combos(grid)
     key = ledger.idea_key(strategy_cls.name, symbols)
     prior_trials, prior_sharpes = ledger.total_trials(), ledger.trial_sharpes()
@@ -236,7 +236,7 @@ def _evaluate_holdout(card, strategy_cls, symbols, wf, settings, v, bench, key, 
     full = ho.holdout_market(v, crypto=[s for s in wanted if is_crypto(s)],
                              stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding,
                              daily=strategy_cls.bars == "daily", carry=carry, spot=(spot_bench,) if carry else ())
-    costs = cost_bps(full, settings)
+    costs = cost_bps(full, settings, strategy_cls.cost_venue)
     strat = strategy_cls(symbols, **params)
     res = _slice_result(run_backtest(full, strat.target_weights(full), costs, name=strat.label()), start)
     bres = _slice_result(run_backtest(full, BuyAndHold([bench]).target_weights(full), costs, name="hold"), start)

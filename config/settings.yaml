@@ -70,6 +70,10 @@ costs:
     commission_bps: 0
     spread_bps: 40
     slippage_bps: 10
+  alpaca_largecaps:      # liquid stocks only (>= $50M a day traded; insider_cluster_large)
+    commission_bps: 0
+    spread_bps: 6
+    slippage_bps: 4
 
 # Cloud: where the hourly GitHub Actions run keeps its data and reports.
 cloud:

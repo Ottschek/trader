@@ -196,6 +196,33 @@ async function watchdog(env, now) {
   ).bind(action === "down" ? "1" : "0", isoUtc(now)).run();
 }
 
+// --- collector kick ----------------------------------------------------------------
+// GitHub often skips scheduled runs for hours. With a token (GITHUB_DISPATCH_TOKEN: fine-grained,
+// this repo only, Actions read/write), the Worker starts the collector itself whenever the last run
+// is older than KICK_AFTER_MINUTES and none is queued or running. GitHub's own schedule stays as a backup.
+
+const KICK_AFTER_MINUTES = 50;
+const ACTIVE = new Set(["queued", "in_progress", "waiting", "pending", "requested"]);
+
+export function shouldKick(lastRunAt, now, recentRuns) {
+  if (recentRuns.some((r) => ACTIVE.has(r.status))) return false;
+  if (!lastRunAt) return true;
+  return now.getTime() - parseTs(lastRunAt) > KICK_AFTER_MINUTES * 60 * 1000;
+}
+
+export async function kickCollector(env, now, http = fetch) {
+  const api = `https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/collect.yml`;
+  const headers = { Authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, Accept: "application/vnd.github+json",
+                    "User-Agent": "trader-scheduler", "X-GitHub-Api-Version": "2022-11-28" };
+  const last = await env.DB.prepare("SELECT max(run_at) AS last FROM collector_runs").first("last");
+  const list = await http(`${api}/runs?per_page=5`, { headers });
+  if (!list.ok) throw new Error(`GitHub runs list: HTTP ${list.status}`);
+  if (!shouldKick(last, now, (await list.json()).workflow_runs ?? [])) return false;
+  const r = await http(`${api}/dispatches`, { method: "POST", headers, body: JSON.stringify({ ref: "main" }) });
+  if (r.status !== 204) throw new Error(`GitHub dispatch: HTTP ${r.status}`);
+  return true;
+}
+
 // --- daily summary ---------------------------------------------------------------
 
 export function formatSummary({ now, timeZone, runs, lastRunAt, problems, datasets, oiCount, coins, dashboard }) {
@@ -254,6 +281,7 @@ export function jobsAt(now, env) {
   if (now.getUTCMinutes() < 30) jobs.push("snapshot", "watchdog");
   if (summaryDue(now, env)) jobs.push("summary");
   if (weeklyDue(now, env)) jobs.push("weekly");
+  if (env.GITHUB_DISPATCH_TOKEN) jobs.push("kick");
   return jobs;
 }
 
@@ -277,6 +305,7 @@ async function run(now, env) {
     watchdog: ["watchdog", () => watchdog(env, now)],
     summary: ["daily summary", () => sendSummary(env, now)],
     weekly: ["weekly report", () => sendWeekly(env, now)],
+    kick: ["collector kick", () => kickCollector(env, now)],
     paper_orders: ["paper: order updates", () => refreshOrders(paperContext(env, now))],
     paper_morning: ["paper: 09:00 decision", () => morning(paperContext(env, now))],
     paper_risk: ["paper: risk check", async () => {

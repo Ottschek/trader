@@ -38,8 +38,9 @@ def benchmark_symbol(strategy: Strategy, settings: Settings) -> str:
     return settings.benchmarks["crypto" if crypto else "stocks"]
 
 
-def cost_bps(data: MarketData, settings: Settings) -> dict[str, float]:
-    return {s: settings.costs[data.venue[s]].one_way_bps for s in data.symbols}
+def cost_bps(data: MarketData, settings: Settings, venue: str | None = None) -> dict[str, float]:
+    """One-way cost per symbol: its own venue's, or `venue`'s for every symbol if given."""
+    return {s: settings.costs[venue or data.venue[s]].one_way_bps for s in data.symbols}
 
 
 def backtest(strategy: Strategy, settings: Settings, start=None, end=None, data: MarketData | None = None,
@@ -50,7 +51,7 @@ def backtest(strategy: Strategy, settings: Settings, start=None, end=None, data:
         data = load_market(crypto=sorted(s for s in symbols if is_crypto(s)),
                            stocks=sorted(s for s in symbols if not is_crypto(s)), start=start, end=end,
                            funding=strategy.needs_funding)
-    costs = cost_bps(data, settings)
+    costs = cost_bps(data, settings, strategy.cost_venue)
     problems = check_no_lookahead(strategy, data)
     result = run_backtest(data, strategy.target_weights(data), costs, name=strategy.label(), allow_short=allow_short)
     bench_result = run_backtest(data, BuyAndHold([bench]).target_weights(data), costs, name=f"hold {bench}")

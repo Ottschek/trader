@@ -146,3 +146,20 @@ def test_sized_insider_positions_shrink_with_volatility():
     assert w["CALM"].max() == pytest.approx(0.05)              # calm stock: full 5% (cap)
     assert 0 < w["WILD"].max() < 0.02                           # 8% daily vol -> ~1.25%
     assert check_no_lookahead(InsiderClusterSized(["CALM", "WILD"], min_insiders=2, hold_days=5, events=events), data) == []
+
+
+def test_large_cap_insider_filter_skips_illiquid_signals_without_using_slots():
+    from trader.strategies.insider import InsiderClusterLarge
+    write_daily(["BIG", "SMALL"])
+    bars = pd.read_parquet(daily_path())
+    bars.loc[bars["symbol"] == "BIG", "volume"] = 1e7          # ~$200M a day; SMALL trades ~$2M
+    bars.to_parquet(daily_path(), index=False)
+    data = load_daily(["BIG", "SMALL"])
+    events = pd.DataFrame([ev("SMALL", "2023-03-01", "o1"), ev("SMALL", "2023-03-02", "o2"),
+                           ev("BIG", "2023-03-03", "o1"), ev("BIG", "2023-03-06", "o2")])
+    strat = InsiderClusterLarge(["BIG", "SMALL"], min_insiders=2, hold_days=5, events=events)
+    strat.MAX_POSITIONS = 1                                       # SMALL must not block BIG's slot
+    w = strat.target_weights(data)
+    assert w["SMALL"].sum() == 0 and w["BIG"].max() == pytest.approx(0.05)
+    assert InsiderClusterLarge.cost_venue == "alpaca_largecaps"
+    assert check_no_lookahead(InsiderClusterLarge(["BIG", "SMALL"], min_insiders=2, hold_days=5, events=events), data) == []

@@ -97,3 +97,22 @@ test("weekly report includes the news analyst once it has run", () => {
   assert.match(formatWeekly({ ...base, news: { runs: 2, signals: 0, cost: 0.1, scored: 0, avgNet: null, hitRate: null } }),
                /No signal scored yet/);
 });
+
+test("collector kick: only when the last run is old and nothing is queued", async () => {
+  const { shouldKick, kickCollector } = await import("../src/index.js");
+  const now = at("2026-10-19T09:00:00Z");
+  assert.equal(shouldKick("2026-10-19T08:20:00Z", now, []), false);           // 40 min ago
+  assert.equal(shouldKick("2026-10-19T08:00:00Z", now, []), true);            // 60 min ago
+  assert.equal(shouldKick("2026-10-19T05:14:00Z", now, [{ status: "queued" }]), false);
+  assert.equal(shouldKick(null, now, [{ status: "completed" }]), true);
+  const calls = [];
+  const http = async (url, opts = {}) => {
+    calls.push([url, opts.method ?? "GET"]);
+    return url.endsWith("/dispatches") ? { status: 204 } : { ok: true, json: async () => ({ workflow_runs: [{ status: "completed" }] }) };
+  };
+  const env = { GITHUB_REPO: "o/r", GITHUB_DISPATCH_TOKEN: "t",
+                DB: { prepare: () => ({ first: async () => "2026-10-19T05:14:00Z" }) } };
+  assert.equal(await kickCollector(env, now, http), true);
+  assert.deepEqual(calls.map((c) => c[1]), ["GET", "POST"]);
+  assert.match(calls[1][0], /repos\/o\/r\/actions\/workflows\/collect\.yml\/dispatches$/);
+});

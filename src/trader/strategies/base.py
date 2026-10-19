@@ -22,6 +22,7 @@ class Strategy:
     signal_symbols: list[str] = []       # extra symbols it reads but never trades (e.g. BTC for crypto stocks)
     needs_funding = False                # needs Hyperliquid funding rates in the data
     bars = "hourly"                      # "daily" -> validated on the broad daily-bar stock universe
+    cost_venue: str | None = None        # every trade pays this venue's costs (strategies that only trade liquid names)
 
     def __init__(self, symbols, **params):
         self.symbols = list(symbols)
