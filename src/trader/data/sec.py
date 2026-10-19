@@ -151,25 +151,45 @@ def parse_8k_earnings(filings: dict, symbol: str) -> pd.DataFrame:
 
 
 def update_earnings_8k(companies: pd.DataFrame, since: str = "2016-01-01", log=print) -> int:
-    """companies: rows with cik and symbol. Fetches older history pages back to `since`."""
-    frames, failed = [], 0
-    for i, row in enumerate(companies.itertuples(index=False)):
-        r = sec_get(f"https://data.sec.gov/submissions/CIK{int(row.cik):010d}.json", timeout=60)
-        if r.status_code != 200:
+    """companies: rows with cik and symbol. Fetches older history pages back to `since`.
+    Resumable: progress is saved every 100 companies, and companies already done are skipped;
+    a network error skips that company (it's retried on the next run)."""
+    state = _load_state()
+    done = set(state.get("earnings_done", []))
+    todo = companies[~companies["cik"].astype(int).isin(done)]
+    frames, failed, added = [], 0, 0
+
+    def flush():
+        nonlocal frames, added
+        if frames:
+            added += upsert(sec_path("earnings_8k.parquet"), pd.concat(frames, ignore_index=True), key=["symbol", "accession"])
+            frames = []
+        state["earnings_done"] = sorted(done)
+        _save_state(state)
+
+    for i, row in enumerate(todo.itertuples(index=False)):
+        try:
+            r = sec_get(f"https://data.sec.gov/submissions/CIK{int(row.cik):010d}.json", timeout=60)
+            if r.status_code != 200:
+                failed += 1
+                continue
+            sub = r.json()
+            parts = [parse_8k_earnings(sub.get("filings", {}).get("recent", {}), row.symbol)]
+            for page in sub.get("filings", {}).get("files", []):   # older history, if any reaches back far enough
+                if page.get("filingTo", "9999") < since:
+                    continue
+                pr = sec_get(f"https://data.sec.gov/submissions/{page['name']}", timeout=60)
+                if pr.status_code != 200:
+                    raise requests.ConnectionError(f"history page {page['name']}: HTTP {pr.status_code}")
+                parts.append(parse_8k_earnings(pr.json(), row.symbol))
+        except requests.RequestException:
             failed += 1
             continue
-        sub = r.json()
-        frames.append(parse_8k_earnings(sub.get("filings", {}).get("recent", {}), row.symbol))
-        for page in sub.get("filings", {}).get("files", []):      # older history, if any reaches back far enough
-            if page.get("filingTo", "9999") < since:
-                continue
-            pr = sec_get(f"https://data.sec.gov/submissions/{page['name']}", timeout=60)
-            if pr.status_code == 200:
-                frames.append(parse_8k_earnings(pr.json(), row.symbol))
-        if (i + 1) % 250 == 0:
-            log(f"  8-K: {i + 1}/{len(companies)} companies")
-    if not frames:
-        return 0
-    added = upsert(sec_path("earnings_8k.parquet"), pd.concat(frames, ignore_index=True), key=["symbol", "accession"])
-    log(f"  8-K: {added} earnings filings added ({failed} companies failed)")
+        frames.extend(parts)
+        done.add(int(row.cik))
+        if (i + 1) % 100 == 0:
+            flush()
+            log(f"  8-K: {i + 1}/{len(todo)} companies this run")
+    flush()
+    log(f"  8-K: +{added} earnings filings; {len(done)} companies done, {failed} failed (rerun to retry)")
     return added
