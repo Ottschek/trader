@@ -195,3 +195,25 @@ def test_darwin_genomes_stay_in_bounds_and_evolved_rules_are_honest():
     strat = EvolvedRule(["AAA/USD"], genes={"use_mom": 1, "mom_days": 20, "mom_min": 0.0, "use_sma": 1, "sma_days": 50,
                                             "sma_ratio": 1.0, "use_vol": 1, "vol_max": 0.08})
     assert check_no_lookahead(strat, data) == []
+
+
+def test_carry_pairs_and_funding_harvest():
+    from trader.backtest.carry import MARGIN_FACTOR, load_carry
+    from trader.backtest.engine import run_backtest
+    from trader.strategies.ideas import FundingHarvest
+    ts = crypto_walk("BTC/USD", start="2023-06-01", days=60, seed=12)       # spot, for the benchmark column
+    rate = np.full(len(ts), 0.00002)                                      # ~17.5%/yr paid to shorts
+    rate[ts >= pd.Timestamp("2023-07-15", tz="UTC")] = -0.00002           # funding flips negative
+    premium = np.zeros(len(ts))
+    path = funding_path("BTC")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"ts": ts, "time": ts, "coin": "BTC", "funding_rate": rate, "premium": premium}).to_parquet(path, index=False)
+    data = load_carry(["BTC/USD"], spot=["BTC/USD"])
+    assert "BTC/USD spot" in data.symbols
+    assert data.intra["BTC/USD"].iloc[5] == pytest.approx(0.00002 * MARGIN_FACTOR)
+    strat = FundingHarvest(["BTC/USD"], min_annual=0.10, lookback_days=3)
+    w = strat.target_weights(data)["BTC/USD"]
+    assert w.loc["2023-07-01"].max() == 1.0 and w.loc["2023-07-25":].max() == 0.0   # on while paid, off after the flip
+    assert check_no_lookahead(strat, data) == []
+    r = run_backtest(data, strat.target_weights(data), {"BTC/USD": 40.0, "BTC/USD spot": 32.5})
+    assert r.equity.iloc[-1] > 1.0                                         # earned funding, paid two trades of costs

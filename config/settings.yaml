@@ -62,6 +62,10 @@ costs:
     commission_bps: 25   # Alpaca crypto taker fee, lowest volume tier
     spread_bps: 5
     slippage_bps: 5
+  carry:                 # funding harvest: buy spot (Alpaca 25 bps) + short perp (Hyperliquid ~4.5 bps), both legs
+    commission_bps: 30
+    spread_bps: 4
+    slippage_bps: 8
   alpaca_smallcaps:      # daily-bar stock universe (insider clusters, earnings drift): wide spreads
     commission_bps: 0
     spread_bps: 40

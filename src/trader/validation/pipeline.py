@@ -124,11 +124,15 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
     grid = grid or strategy_cls.default_grid
     symbols = list(symbols)
     bench = benchmark or benchmark_symbol(strategy_cls(symbols, **param_combos(grid)[0]), settings)
+    carry = strategy_cls.bars == "carry"
     if data is None:
         wanted = sorted(set(symbols) | {bench} | set(strategy_cls.signal_symbols))
         data = ho.research_market(v, crypto=[s for s in wanted if is_crypto(s)],
                                   stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding,
-                                  daily=strategy_cls.bars == "daily")
+                                  daily=strategy_cls.bars == "daily", carry=carry, spot=(bench,) if carry else ())
+    if carry:
+        from trader.backtest.carry import SPOT_SUFFIX
+        bench = bench + SPOT_SUFFIX          # the rule's benchmark is holding the coin itself, not its carry pair
     if data.index.max() >= pd.Timestamp(v.holdout_start, tz="UTC"):
         raise ho.HoldoutLocked("research data must end before the holdout")
     costs = cost_bps(data, settings)
@@ -226,10 +230,12 @@ def _evaluate_holdout(card, strategy_cls, symbols, wf, settings, v, bench, key, 
     start = pd.Timestamp(v.holdout_start, tz="UTC")
     train = pd.DateOffset(months=int(round(v.train_years * 12)))
     params = wf.best_params(start - train, start)      # final pick, using only pre-holdout data
-    wanted = sorted(set(symbols) | {bench} | set(strategy_cls.signal_symbols))
+    carry = strategy_cls.bars == "carry"
+    spot_bench = bench.removesuffix(" spot")
+    wanted = sorted(set(symbols) | {spot_bench} | set(strategy_cls.signal_symbols))
     full = ho.holdout_market(v, crypto=[s for s in wanted if is_crypto(s)],
                              stocks=[s for s in wanted if not is_crypto(s)], funding=strategy_cls.needs_funding,
-                             daily=strategy_cls.bars == "daily")
+                             daily=strategy_cls.bars == "daily", carry=carry, spot=(spot_bench,) if carry else ())
     costs = cost_bps(full, settings)
     strat = strategy_cls(symbols, **params)
     res = _slice_result(run_backtest(full, strat.target_weights(full), costs, name=strat.label()), start)

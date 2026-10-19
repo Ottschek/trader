@@ -165,3 +165,33 @@ class ComboSleeves(Strategy):
             w = sleeve.target_weights(data).reindex(data.index).ffill().fillna(0.0)
             total[w.columns] += third * w
         return total
+
+
+class FundingHarvest(Strategy):
+    """Cash-and-carry on perpetual futures: own the coin spot and short the same amount of its
+    perp, collecting the funding that longs pay shorts, with no bet on the price. Held only while
+    the past `lookback_days` of funding averaged more than `min_annual` per year (funding can turn
+    negative in sell-offs). Re-decided once a day; equal weight per coin. Uses carry pairs
+    (backtest/carry.py), not spot prices."""
+    name = "funding_harvest"
+    bars = "carry"
+    default_grid = {"min_annual": [0.10, 0.20], "lookback_days": [3, 7]}
+
+    def __init__(self, symbols, min_annual: float = 0.10, lookback_days: int = 7):
+        super().__init__(symbols, min_annual=min_annual, lookback_days=lookback_days)
+
+    def target_weights(self, data: MarketData) -> pd.DataFrame:
+        from trader.strategies.helpers import has_history, once_a_day
+
+        w = 1.0 / len(self.symbols)
+        window = pd.Timedelta(days=self.params["lookback_days"])
+        out = {}
+        for s in self.symbols:
+            if data.funding is None or s not in data.funding:
+                out[s] = pd.Series(0.0, index=data.index)
+                continue
+            f = data.funding[s].dropna()
+            annual = f.rolling(window).mean() * 24 * 365
+            on = (annual > self.params["min_annual"]) & has_history(f, window)
+            out[s] = once_a_day(on.astype(float), stock=False) * w
+        return pd.DataFrame(out).reindex(data.index)
