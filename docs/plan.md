@@ -303,6 +303,9 @@ insider and hype data, more crazy ideas — all through the same funnel.
   language), kept only if the training Sharpe improves. No proposal ever beat the start (2.75 in-sample): it kept
   adding filters that cut the winners along with the losers. The start rule then failed the six tests: OOS Sharpe
   0.96 (BTC 0.68), timing p = 0.038, drawdown −55.2%, deflated 0.00; 21 rules counted as trials.
+- **turn_of_month** (reel on "who is forced to trade"; designed and committed before testing): SPY/QQQ/IWM from the
+  last 1-2 trading days of a month to the 2nd-3rd of the next, NYSE holiday calendar (known in advance). Rejected:
+  OOS Sharpe 0.00, timing p = 0.804. The effect documented in 1987-2008 studies isn't there in 2018-2024.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
