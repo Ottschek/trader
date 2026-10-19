@@ -267,6 +267,18 @@ insider and hype data, more crazy ideas — all through the same funnel.
   with an expected 1–5 day impact (−2..+2); per asset, |sum| ≥ 2 is a long/short signal, scored from the next
   open against SPY/BTC after round-trip costs at 1 and 5 days. Spend capped at $5/month in code (paced evenly).
   No backtest on purpose: the model would know what happened next. Runs once ANTHROPIC_API_KEY is set.
+  Decision 2026-10-19: no paid API key, so the analyst stays built but dormant.
+- **News word-list score** (free forward shadow, rules frozen 2026-10-19): the same headlines and schedule, scored
+  with fixed lists of positive/negative news-event phrases (beats/misses, guidance, upgrades, lawsuits, hacks...;
+  price-move words left out). A headline counts for an asset only if it came from that asset's feed and names it.
+  Same signal threshold and forward scoring as the analyst.
+- **Collector kick:** GitHub skipped hourly runs for up to 4 hours at a time, so the Worker (reliable 30-minute
+  clock) starts the collector through GitHub's API when the last run is over 50 minutes old and none is queued.
+  Needs a fine-grained token (GITHUB_DISPATCH_TOKEN, this repo only, Actions read/write).
+- **insider_cluster_large** (designed and committed before testing): the same clusters, but only in stocks trading
+  >= $50M a day (20-day average known at the signal), with a large-cap cost profile (7 bps one way).
+  Rejected: OOS Sharpe 0.08 vs SPY 0.76, drawdown −45.3%, timing p = 0.739. In liquid stocks the timing
+  information is gone: the insider edge lives in small caps, where costs eat it.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
