@@ -21,6 +21,7 @@ from trader.strategies.examples import RandomEntry, SmaCross
 from trader.strategies.earnings import EarningsDrift
 from trader.strategies.overnight import OvernightHold
 from trader.strategies.reversal import WeeklyReversal
+from trader.strategies.turn_of_month import TurnOfMonth
 from trader.strategies.insider import InsiderCluster, InsiderClusterLarge, InsiderClusterSized
 from trader.strategies.ideas import ComboSleeves, FundingContrarian, FundingHarvest, WeekendGap, WeekendGapSized
 from trader.ledger import sync
@@ -34,7 +35,7 @@ STRATEGIES = {"sma": SmaCross, "random": RandomEntry, "momentum": TsMomentum, "d
               "earnings": EarningsDrift, "harvest": FundingHarvest,
               "stablecoins": StablecoinPrinter, "attention": AttentionFilter, "insider_sized": InsiderClusterSized,
               "insider_large": InsiderClusterLarge, "reversal": WeeklyReversal,
-              "overnight": OvernightHold}
+              "overnight": OvernightHold, "turn_of_month": TurnOfMonth}
 
 
 def _value(text: str):
