@@ -152,7 +152,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
 
     # 2-4. walk-forward
     wf = walk_forward(strategy_cls, symbols, grid, data, costs, v.train_years, v.test_months,
-                      BuyAndHold([bench]).target_weights(data))
+                      BuyAndHold([bench]).target_weights(data), allow_short=strategy_cls.allow_short)
     oos, boos = summarize(wf.oos), summarize(wf.benchmark_oos)
 
     # 5. random entry, on the out-of-sample record
@@ -238,7 +238,8 @@ def _evaluate_holdout(card, strategy_cls, symbols, wf, settings, v, bench, key, 
                              daily=strategy_cls.bars == "daily", carry=carry, spot=(spot_bench,) if carry else ())
     costs = cost_bps(full, settings, strategy_cls.cost_venue)
     strat = strategy_cls(symbols, **params)
-    res = _slice_result(run_backtest(full, strat.target_weights(full), costs, name=strat.label()), start)
+    res = _slice_result(run_backtest(full, strat.target_weights(full), costs, name=strat.label(),
+                                     allow_short=strategy_cls.allow_short), start)
     bres = _slice_result(run_backtest(full, BuyAndHold([bench]).target_weights(full), costs, name="hold"), start)
     s, b = summarize(res), summarize(bres)
     passed = s["sharpe"] >= v.min_oos_sharpe and s["sharpe"] > b["sharpe"] and s["max_drawdown"] >= -v.max_oos_drawdown

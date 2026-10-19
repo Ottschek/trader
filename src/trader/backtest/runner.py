@@ -53,6 +53,7 @@ def backtest(strategy: Strategy, settings: Settings, start=None, end=None, data:
                            funding=strategy.needs_funding)
     costs = cost_bps(data, settings, strategy.cost_venue)
     problems = check_no_lookahead(strategy, data)
-    result = run_backtest(data, strategy.target_weights(data), costs, name=strategy.label(), allow_short=allow_short)
+    result = run_backtest(data, strategy.target_weights(data), costs, name=strategy.label(),
+                          allow_short=allow_short or strategy.allow_short)
     bench_result = run_backtest(data, BuyAndHold([bench]).target_weights(data), costs, name=f"hold {bench}")
     return Report(result, bench_result, [summarize(result), summarize(bench_result)], problems)

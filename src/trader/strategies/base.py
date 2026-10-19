@@ -23,6 +23,7 @@ class Strategy:
     needs_funding = False                # needs Hyperliquid funding rates in the data
     bars = "hourly"                      # "daily" -> validated on the broad daily-bar stock universe
     cost_venue: str | None = None        # every trade pays this venue's costs (strategies that only trade liquid names)
+    allow_short = False                  # negative weights allowed (validated with shorts in every backtest)
 
     def __init__(self, symbols, **params):
         self.symbols = list(symbols)
