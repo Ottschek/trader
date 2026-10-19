@@ -67,32 +67,50 @@ def parse_text(result: dict) -> str | None:
     return text if isinstance(text, str) or text is None else json.dumps(text)
 
 
-def ask_llama(cfg: dict, rows: pd.DataFrame, now: pd.Timestamp, post=requests.post) -> dict:
+class WorkersAIError(Exception):
+    pass
+
+
+def chat(messages: list[dict], max_tokens: int, model: str = MODEL, post=requests.post) -> tuple[str, float | None]:
+    """One Workers AI chat call (free allowance). Returns (text, neurons used)."""
     from trader.config import secret
 
-    url = f"https://api.cloudflare.com/client/v4/accounts/{secret('CLOUDFLARE_ACCOUNT_ID')}/ai/run/{cfg.get('free_model', MODEL)}"
-    assets = cfg["assets"]
-    system = na.SYSTEM.format(assets="\n".join(f"- {s}: {name}" for s, name in assets.items())) + FORMAT
-    body = {"messages": [{"role": "system", "content": system},
-                         {"role": "user", "content": na.user_message(rows, now)}],
-            "max_tokens": MAX_TOKENS}
+    url = f"https://api.cloudflare.com/client/v4/accounts/{secret('CLOUDFLARE_ACCOUNT_ID')}/ai/run/{model}"
     try:
-        r = post(url, headers={"Authorization": f"Bearer {secret('CLOUDFLARE_API_TOKEN')}"}, json=body, timeout=120)
+        r = post(url, headers={"Authorization": f"Bearer {secret('CLOUDFLARE_API_TOKEN')}"},
+                 json={"messages": messages, "max_tokens": max_tokens}, timeout=120)
     except requests.RequestException as e:            # never let the URL/headers end up in logs
-        return {"status": f"request failed: {type(e).__name__}", "flags": []}
+        raise WorkersAIError(f"request failed: {type(e).__name__}") from None
     if r.status_code != 200:
-        return {"status": f"HTTP {r.status_code}", "flags": []}
+        raise WorkersAIError(f"HTTP {r.status_code}")
     result = r.json().get("result") or {}
-    text = parse_text(result)
+    return parse_text(result) or "", (result.get("usage") or {}).get("neurons")
+
+
+def extract_json(text: str):
+    """The first {...} block in a model answer, parsed; None if there is none or it isn't JSON."""
     m = re.search(r"\{.*\}", text or "", re.S)
     try:
-        raw = json.loads(m.group(0))["flags"] if m else None
-    except (ValueError, KeyError, TypeError):
-        raw = None
+        return json.loads(m.group(0)) if m else None
+    except ValueError:
+        return None
+
+
+def ask_llama(cfg: dict, rows: pd.DataFrame, now: pd.Timestamp, post=requests.post) -> dict:
+    assets = cfg["assets"]
+    system = na.SYSTEM.format(assets="\n".join(f"- {s}: {name}" for s, name in assets.items())) + FORMAT
+    try:
+        text, neurons = chat([{"role": "system", "content": system},
+                              {"role": "user", "content": na.user_message(rows, now)}],
+                             MAX_TOKENS, cfg.get("free_model", MODEL), post)
+    except WorkersAIError as e:
+        return {"status": str(e), "flags": []}
+    parsed = extract_json(text)
+    raw = parsed.get("flags") if isinstance(parsed, dict) else None
     if not isinstance(raw, list):
         return {"status": "bad json", "flags": []}
     flags = match_flags(raw, rows, assets)
-    return {"status": "ok", "flags": flags, "dropped": len(raw) - len(flags), "usage": (result.get("usage") or {}).get("neurons")}
+    return {"status": "ok", "flags": flags, "dropped": len(raw) - len(flags), "usage": neurons}
 
 
 def run(settings, now: pd.Timestamp, post=requests.post) -> str:

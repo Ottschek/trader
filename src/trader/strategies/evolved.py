@@ -69,3 +69,18 @@ class EvolvedRule(Strategy):
             hold = rule_signal(c, self.genes).astype(float)
             out[s] = once_a_day(hold, stock=not is_crypto(s)) * w
         return pd.DataFrame(out).reindex(data.index)
+
+
+AGENT_POPULATION = PROJECT_ROOT / "config" / "agent_loop.json"
+
+
+class AgentRule(EvolvedRule):
+    """The rule an AI agent loop arrived at by "fixing losing trades" (scripts/agent_loop.py, idea from
+    an Instagram reel). Same rule language as Darwin; the loop's final rule and full transcript live
+    in config/agent_loop.json."""
+    name = "agent_loop"
+    default_grid = {"genome": [0]}
+
+    def __init__(self, symbols, genome: int = 0, genes: dict | None = None):
+        Strategy.__init__(self, symbols, genome=genome)
+        self.genes = genes if genes is not None else load_population(AGENT_POPULATION)[genome]["genes"]
