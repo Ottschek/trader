@@ -231,11 +231,12 @@ def summary(signals: pd.DataFrame, horizons=(1, 5)) -> dict:
     return res
 
 
-def rescore(settings, horizons=(1, 5)) -> pd.DataFrame:
-    """Score all stored signals with the latest prices and save them."""
+def rescore(settings, horizons=(1, 5), path=None) -> pd.DataFrame:
+    """Score all stored signals (this analyst's, or those in `path`) with the latest prices and save them."""
     from trader.backtest.data import load_market
 
-    signals = read(signals_path())
+    path = path or signals_path()
+    signals = read(path)
     if signals.empty:
         return signals
     syms = set(signals["symbol"])
@@ -246,7 +247,7 @@ def rescore(settings, horizons=(1, 5)) -> pd.DataFrame:
     bench = {s: settings.benchmarks["crypto" if "/" in s else "stocks"] for s in syms}
     costs = {s: settings.costs[data.venue[s]].one_way_bps for s in syms}
     scored = score_signals(signals, data.open, data.close, data.index[-1] + BAR, bench, costs, horizons)
-    upsert(signals_path(), scored, key=["id"])
+    upsert(path, scored, key=["id"])
     return scored
 
 
@@ -312,7 +313,7 @@ def run(settings, now: pd.Timestamp, client=None) -> str:
 
 # --- D1 mirror for the web app and the weekly report ---------------------------------------
 
-SIGNAL_COLUMNS = ["id", "decided_at", "symbol", "side", "score", "headlines", "entry_ts", "entry_px",
+SIGNAL_COLUMNS = ["id", "source", "decided_at", "symbol", "side", "score", "headlines", "entry_ts", "entry_px",
                   "ret_1d", "excess_1d", "net_1d", "ret_5d", "excess_5d", "net_5d"]
 RUN_COLUMNS = ["ts", "model", "headlines", "flagged", "signals", "input_tokens", "output_tokens", "cost_usd", "status"]
 
@@ -326,16 +327,19 @@ def _value(v):
 
 
 def mirror_to_d1(d1, now: pd.Timestamp, days: int = 10) -> int:
-    """Copy recent runs and every signal decided in the last `days` (still being scored) to D1."""
+    """Copy recent runs and every signal (analyst and word list) decided in the last `days` to D1."""
     since = now - pd.Timedelta(days=days)
     n = 0
     runs = read(runs_path())
     if not runs.empty:
         runs = runs[runs["ts"] >= since]
         n += d1.insert_many("news_runs", RUN_COLUMNS, [tuple(_value(r[c]) for c in RUN_COLUMNS) for _, r in runs.iterrows()])
-    signals = read(signals_path())
-    if not signals.empty:
-        signals = signals[signals["decided_at"] >= since]
+    from trader.paper.news_lexicon import signals_path as lexicon_path
+    for source, path in (("claude", signals_path()), ("lexicon", lexicon_path())):
+        signals = read(path)
+        if signals.empty:
+            continue
+        signals = signals[signals["decided_at"] >= since].assign(source=source)
         for c in SIGNAL_COLUMNS:
             if c not in signals:
                 signals[c] = None

@@ -142,3 +142,51 @@ def test_without_a_key_the_analyst_is_skipped(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("trader.config.load_dotenv", lambda *a, **k: None)
     assert na.run(SimpleNamespace(news=CFG), NOW) == "skipped: no ANTHROPIC_API_KEY"
+
+
+# --- word-list score ----------------------------------------------------------------------
+
+from trader.paper import news_lexicon as lex   # noqa: E402
+
+
+def test_word_list_scores_events_not_price_moves_or_clickbait():
+    assert lex.headline_score("Nvidia beats estimates and raises guidance") == 2
+    assert lex.headline_score("Tesla cuts outlook as SEC charges executives with fraud") == -2      # capped
+    assert lex.headline_score("Nvidia stock surges 8% today") == 0                                 # price move only
+    assert lex.headline_score("Don't miss these 3 AI stocks") == 0
+    assert lex.headline_score("Coinbase misses revenue estimates") == -1
+
+
+def test_word_list_needs_the_feed_tag_and_a_mention():
+    rows = pd.DataFrame({"title": ["Coinbase wins approval for derivatives", "Chainlink hacked in exploit",
+                                   "Crypto exchange hacked", "Nvidia upgraded at Morgan Stanley"],
+                         "link": ["a", "b", "c", "d"], "tags": ["COIN", "LINK/USD,ETH/USD", "LINK/USD", "AAPL"]})
+    scored = lex.score_headlines(rows, list(lex.ALIASES))
+    assert [(s["symbol"], s["score"]) for s in scored] == [("COIN", 1), ("LINK/USD", -2)]   # no mention / wrong feed -> skipped
+    sig = lex.signals_from_scores(scored, NOW, 2)
+    assert list(sig["symbol"]) == ["LINK/USD"] and sig.at[0, "side"] == -1 and sig.at[0, "id"].startswith("lex-")
+
+
+def test_word_list_run_is_free_and_paced_like_the_analyst():
+    settings = SimpleNamespace(news=CFG | {"assets": {"NVDA": "Nvidia", "SPY": "S&P 500"}})
+    rows = pd.DataFrame({"guid": ["a", "b"], "title": ["Nvidia beats estimates, raises outlook", "Nvidia wins approval"],
+                         "link": ["l1", "l2"], "tags": ["NVDA", "NVDA"],
+                         "published": [NOW - pd.Timedelta(hours=1)] * 2, "ts": [NOW - pd.Timedelta(hours=1)] * 2})
+    upsert(news.headlines_path(), rows, key=["guid"])
+    assert lex.run(settings, NOW) == "2 headlines, 2 scored, long NVDA (+3)"
+    assert lex.run(settings, NOW + pd.Timedelta(hours=2)).startswith("not due")
+    assert read(lex.signals_path())["score"].tolist() == [3]
+
+
+def test_d1_mirror_labels_each_signal_with_its_source():
+    sig = pd.DataFrame([{"id": "x", "decided_at": NOW, "symbol": "NVDA", "side": 1, "score": 2, "headlines": "[]"}])
+    upsert(na.signals_path(), sig, key=["id"])
+    upsert(lex.signals_path(), sig.assign(id="lex-x"), key=["id"])
+    na.record_run({"ts": NOW, "model": "m", "headlines": 1, "flagged": 1, "signals": 1, "input_tokens": 1,
+                   "output_tokens": 1, "cost_usd": 0.01, "status": "ok"})
+    inserted = []
+    d1 = SimpleNamespace(insert_many=lambda table, cols, rows: inserted.append((table, cols, rows)) or len(rows))
+    assert na.mirror_to_d1(d1, NOW) == 3
+    signals = [dict(zip(cols, r)) for t, cols, rows in inserted if t == "news_signals" for r in rows]
+    assert {(s["id"], s["source"]) for s in signals} == {("x", "claude"), ("lex-x", "lexicon")}
+    assert signals[0]["entry_ts"] is None and signals[0]["decided_at"].startswith("2026-10-19T12:07")

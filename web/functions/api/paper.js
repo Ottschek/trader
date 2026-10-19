@@ -13,7 +13,7 @@ export async function onRequestGet({ env }) {
     env.DB.prepare("SELECT summary FROM paper_reconcile ORDER BY computed_at DESC LIMIT 1"),
     env.DB.prepare("SELECT * FROM carry_sim WHERE ts >= ? ORDER BY ts").bind(since),
     env.DB.prepare("SELECT * FROM news_runs ORDER BY ts DESC LIMIT 200"),
-    env.DB.prepare("SELECT * FROM news_signals ORDER BY decided_at DESC LIMIT 500"),
+    env.DB.prepare("SELECT * FROM news_signals ORDER BY decided_at DESC LIMIT 1000"),
   ]);
   const p = plan.results[0];
   return Response.json({

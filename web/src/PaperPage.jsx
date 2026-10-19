@@ -162,55 +162,51 @@ function scoredStats(signals, h) {
   return { n: net.length, mean: net.reduce((a, b) => a + b, 0) / net.length, hit: net.filter((v) => v > 0).length / net.length };
 }
 
-function NewsAnalyst({ news }) {
-  const runs = news?.runs ?? [], signals = news?.signals ?? [];
-  const head = (
-    <div className="card-head">
-      <h2>LLM news analyst</h2>
-      <span className="muted">shadow · no real orders · Claude reads Yahoo Finance headlines every 6 hours</span>
+function SourceStats({ label, signals, extra }) {
+  const d1 = scoredStats(signals, 1), d5 = scoredStats(signals, 5);
+  const hit = (d) => `${d.n} scored${d.hit != null ? ` · ${Math.round(d.hit * 100)}% winners` : ""}`;
+  return (
+    <div className="mini-stats">
+      <div><span className="muted small">{label}</span><strong>{signals.length} signals</strong></div>
+      <div><span className="muted small">1-day net excess (avg)</span><strong>{pct(d1.mean, 2)}</strong><span className="muted small">{hit(d1)}</span></div>
+      <div><span className="muted small">5-day net excess (avg)</span><strong>{pct(d5.mean, 2)}</strong><span className="muted small">{hit(d5)}</span></div>
+      {extra}
     </div>
   );
-  if (runs.length === 0) {
-    return (
-      <section className="card">
-        {head}
-        <p className="muted">Waiting for the first run. Headlines are collected every hour; the analysis starts once an
-          Anthropic API key is set (budget capped at $5 a month in code).</p>
-      </section>
-    );
-  }
+}
+
+function NewsSignals({ news }) {
+  const runs = news?.runs ?? [], signals = news?.signals ?? [];
+  const lexicon = signals.filter((s) => s.source === "lexicon"), claude = signals.filter((s) => s.source !== "lexicon");
   const month = new Date().toISOString().slice(0, 7);
   const spent = runs.filter((r) => r.ts.startsWith(month)).reduce((a, r) => a + r.cost_usd, 0);
-  const d1 = scoredStats(signals, 1), d5 = scoredStats(signals, 5);
-  const last = runs[0];
   return (
     <section className="card">
-      {head}
-      <div className="mini-stats">
-        <div><span className="muted small">Signals</span><strong>{signals.length}</strong></div>
-        <div><span className="muted small">1-day net excess (avg)</span><strong>{pct(d1.mean, 2)}</strong>
-          <span className="muted small">{d1.n} scored{d1.hit != null ? ` · ${Math.round(d1.hit * 100)}% winners` : ""}</span></div>
-        <div><span className="muted small">5-day net excess (avg)</span><strong>{pct(d5.mean, 2)}</strong>
-          <span className="muted small">{d5.n} scored{d5.hit != null ? ` · ${Math.round(d5.hit * 100)}% winners` : ""}</span></div>
-        <div><span className="muted small">Spent this month</span><strong>${spent.toFixed(2)}</strong>
-          <span className="muted small">of $5.00</span></div>
-        <div><span className="muted small">Last run</span><strong>{shortDateTime(last.ts)}</strong>
-          <span className="muted small">{last.headlines} headlines · {last.flagged} flagged · {last.status}</span></div>
+      <div className="card-head">
+        <h2>News signals</h2>
+        <span className="muted">shadow · no real orders · Yahoo Finance headlines, scored every 6 hours</span>
       </div>
+      <SourceStats label="Word list (free)" signals={lexicon} />
+      {runs.length > 0
+        ? <SourceStats label="LLM analyst (Claude)" signals={claude}
+            extra={<div><span className="muted small">Spent this month</span><strong>${spent.toFixed(2)}</strong><span className="muted small">of $5.00</span></div>} />
+        : <p className="muted small">LLM analyst: off (no API key). It is built and would start on its own if a key were added.</p>}
+      {signals.length === 0 && <p className="muted">No signals yet. Headlines are collected every hour.</p>}
       {signals.length > 0 && (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Decided</th><th>Asset</th><th>Side</th><th>Why</th>
+            <thead><tr><th>Decided</th><th>Source</th><th>Asset</th><th>Side</th><th>Why</th>
               <th className="num">1 day</th><th className="num">5 days</th></tr></thead>
             <tbody>
               {signals.slice(0, 30).map((s) => (
                 <tr key={s.id}>
                   <td>{shortDateTime(s.decided_at)}</td>
+                  <td>{s.source === "lexicon" ? "Word list" : "Claude"}</td>
                   <td>{s.symbol}</td>
                   <td><StatusBadge status={s.side > 0 ? "ok" : "fail"}>{s.side > 0 ? "Long" : "Short"} {s.score > 0 ? "+" : ""}{s.score}</StatusBadge></td>
                   <td className="small">{s.headlines.map((h, i) => (
                     <div key={i}><a href={h.link} target="_blank" rel="noreferrer">{h.title}</a>
-                      <span className="muted"> · {h.impact > 0 ? "+" : ""}{h.impact} {h.reason}</span></div>
+                      <span className="muted"> · {h.impact > 0 ? "+" : ""}{h.impact}{h.reason !== "word list" ? ` ${h.reason}` : ""}</span></div>
                   ))}</td>
                   <td className="num">{s.net_1d == null ? "pending" : pct(s.net_1d, 2)}</td>
                   <td className="num">{s.net_5d == null ? "pending" : pct(s.net_5d, 2)}</td>
@@ -220,10 +216,9 @@ function NewsAnalyst({ news }) {
           </table>
         </div>
       )}
-      <p className="muted small">A signal is a run where the headlines about one asset add up to an impact of ±2 or more.
+      <p className="muted small">A signal is a 6-hour window where one asset's headline scores add up to ±2 or more.
         Returns run from the next open, minus the benchmark (SPY for stocks, BTC for coins) and round-trip costs.
-        Rules were frozen on 19 Oct 2026; there is no backtest, because a model can't judge old headlines
-        without already knowing what happened next.</p>
+        Rules frozen on 19 Oct 2026; forward only, no backtest.</p>
     </section>
   );
 }
@@ -339,7 +334,7 @@ function Paper({ data }) {
       </section>
       <LiveVsBacktest r={data.reconcile} />
       <CarrySim rows={data.carry} />
-      <NewsAnalyst news={data.news} />
+      <NewsSignals news={data.news} />
       <Plan plan={data.plan} />
       <Decisions decisions={data.decisions} />
       <Orders orders={data.orders} />

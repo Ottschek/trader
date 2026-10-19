@@ -241,17 +241,19 @@ def reconcile_paper(settings, now) -> None:
 
 
 def news_analyst(settings, now) -> None:
-    """LLM news analyst shadow: analyze new headlines when due, then score past signals."""
+    """News shadows: the LLM analyst (needs a key) and the free word-list score, then score past signals."""
     from trader.paper import news_analyst as na
+    from trader.paper import news_lexicon as lex
 
-    try:
-        print(f"News analyst: {na.run(settings, now)}")
-        scored = na.rescore(settings)
-        if len(scored):
-            s = na.summary(scored)
-            print(f"  {s['signals']} signals so far; 1-day net excess {s['1d']['mean_net']} over {s['1d']['n']} scored")
-    except Exception as e:  # noqa: BLE001 - never let the news experiment break data collection
-        print(f"News analyst skipped: {type(e).__name__}: {e}")
+    for label, step, path in (("News analyst", na.run, na.signals_path()), ("News word list", lex.run, lex.signals_path())):
+        try:
+            print(f"{label}: {step(settings, now)}")
+            scored = na.rescore(settings, path=path)
+            if len(scored):
+                s = na.summary(scored)
+                print(f"  {s['signals']} signals so far; 1-day net excess {s['1d']['mean_net']} over {s['1d']['n']} scored")
+        except Exception as e:  # noqa: BLE001 - never let the news experiments break data collection
+            print(f"{label} skipped: {type(e).__name__}: {e}")
 
 
 def mirror_news(settings, now) -> None:
