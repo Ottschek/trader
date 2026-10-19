@@ -279,6 +279,11 @@ insider and hype data, more crazy ideas — all through the same funnel.
   >= $50M a day (20-day average known at the signal), with a large-cap cost profile (7 bps one way).
   Rejected: OOS Sharpe 0.08 vs SPY 0.76, drawdown −45.3%, timing p = 0.739. In liquid stocks the timing
   information is gone: the insider edge lives in small caps, where costs eat it.
+- **weekly_reversal** (idea from a reel; designed and committed before testing): every Friday, long the 20-50 worst
+  and short the 20-50 best liquid stocks (>= $50M a day, >= $5) over the last 5 or 20 days, 50/50, held a week,
+  large-cap costs. Rejected, but the closest call so far: OOS Sharpe 0.78 (SPY 0.76), 17.4% a year, timing
+  p = 0.004; fails Sharpe >= 1, drawdown (−29.3%) and the deflated Sharpe (0.26 at ~495 effective trials).
+  Costs 4.2% a year; borrow fees not modeled.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
