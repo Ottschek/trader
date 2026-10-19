@@ -91,6 +91,27 @@ class InsiderCluster(Strategy):
             if len(open_until) >= self.MAX_POSITIONS:
                 continue                                  # portfolio full: skip, as a real trader would
             end = min(row + self.params["hold_days"], len(days))
-            w[row:end, col[sig.symbol]] = self.POSITION
+            w[row:end, col[sig.symbol]] = self.position_size(data, col[sig.symbol], row)
             open_until.append(end)
         return pd.DataFrame(w, index=data.index, columns=data.close.columns)[tradable]
+
+    def position_size(self, data: MarketData, column: int, row: int) -> float:
+        return self.POSITION
+
+
+class InsiderClusterSized(InsiderCluster):
+    """Insider clusters with each position sized to TARGET_VOL daily volatility (past 20 days,
+    fixed at entry), capped at the original 5%: the small caps that crashed together in 2020 and
+    2022 get proportionally less. Same signals and grid as insider_cluster."""
+    name = "insider_cluster_sized"
+    TARGET_VOL = 0.02
+
+    def position_size(self, data: MarketData, column: int, row: int) -> float:
+        if not hasattr(self, "_vol") or self._vol_data is not data:
+            bar_ret = (1 + data.gap) * (1 + data.intra) - 1
+            self._vol = bar_ret.where(data.tradable).rolling(20, min_periods=15).std().to_numpy()
+            self._vol_data = data
+        vol = self._vol[row, column]
+        if not np.isfinite(vol) or vol <= 0:
+            return 0.0                    # not enough history to size the position: skip it
+        return self.POSITION * min(1.0, self.TARGET_VOL / vol)

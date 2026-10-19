@@ -123,3 +123,26 @@ def test_simultaneous_signals_fill_the_last_slot_deterministically():
     w2 = EarningsDrift(["AAA", "BBB", "SPY"], threshold=0.05, hold_days=10, events=reversed_events)
     w2.MAX_POSITIONS = 1
     assert w2.target_weights(data).equals(w)
+
+
+def test_sized_insider_positions_shrink_with_volatility():
+    from trader.strategies.insider import InsiderClusterSized
+    idx = pd.bdate_range("2023-01-02", periods=120)
+    rows = []
+    rng = np.random.default_rng(1)
+    for s, vol in [("CALM", 0.01), ("WILD", 0.08)]:
+        close = 20 * np.exp(np.cumsum(rng.normal(0, vol, len(idx))))
+        for t, c in zip(idx, close):
+            rows.append({"ts": pd.Timestamp(f"{t.date()} 00:00", tz="America/New_York").tz_convert("UTC"), "symbol": s,
+                         "open": c, "high": c, "low": c, "close": c, "volume": 1e5})
+    path = daily_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_parquet(path, index=False)
+    data = load_daily(["CALM", "WILD"])
+    events = pd.DataFrame([ev("CALM", "2023-04-03", "o1"), ev("CALM", "2023-04-04", "o2"),
+                           ev("WILD", "2023-04-03", "o1"), ev("WILD", "2023-04-04", "o2")])
+    strat = InsiderClusterSized(["CALM", "WILD"], min_insiders=2, hold_days=5, events=events)
+    w = strat.target_weights(data)
+    assert w["CALM"].max() == pytest.approx(0.05)              # calm stock: full 5% (cap)
+    assert 0 < w["WILD"].max() < 0.02                           # 8% daily vol -> ~1.25%
+    assert check_no_lookahead(InsiderClusterSized(["CALM", "WILD"], min_insiders=2, hold_days=5, events=events), data) == []

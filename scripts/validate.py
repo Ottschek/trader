@@ -19,7 +19,7 @@ from trader.strategies.altdata import AttentionFilter, StablecoinPrinter
 from trader.strategies.baselines import DipBuyer, RegimeFilter, TsMomentum
 from trader.strategies.examples import RandomEntry, SmaCross
 from trader.strategies.earnings import EarningsDrift
-from trader.strategies.insider import InsiderCluster
+from trader.strategies.insider import InsiderCluster, InsiderClusterSized
 from trader.strategies.ideas import ComboSleeves, FundingContrarian, FundingHarvest, WeekendGap, WeekendGapSized
 from trader.ledger import sync
 from trader.validation import report_html
@@ -30,7 +30,7 @@ STRATEGIES = {"sma": SmaCross, "random": RandomEntry, "momentum": TsMomentum, "d
               "regime": RegimeFilter, "weekend": WeekendGap, "weekend_sized": WeekendGapSized,
               "funding": FundingContrarian, "combo": ComboSleeves, "insider": InsiderCluster,
               "earnings": EarningsDrift, "harvest": FundingHarvest,
-              "stablecoins": StablecoinPrinter, "attention": AttentionFilter}
+              "stablecoins": StablecoinPrinter, "attention": AttentionFilter, "insider_sized": InsiderClusterSized}
 
 
 def _value(text: str):
