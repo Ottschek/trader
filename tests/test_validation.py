@@ -207,3 +207,22 @@ def test_deflated_gate_uses_effective_totals(settings):
     assert card.effective_trials <= card.trials
     assert ledger.total_effective_trials() == pytest.approx(card.effective_trials, abs=0.01)
     assert "eff. trials" in card.gates[-1].value
+
+
+def test_bootstrap_mean_test_tells_a_real_drift_from_noise():
+    import numpy as np
+    import pandas as pd
+
+    from trader.validation.montecarlo import bootstrap_mean_test
+    idx = pd.date_range("2023-01-01", periods=24 * 400, freq="h", tz="UTC")
+    rng = np.random.default_rng(0)
+    noise = pd.Series(rng.normal(0, 0.001, len(idx)), index=idx)
+    assert bootstrap_mean_test(noise + 0.0002, trials=200).p_value <= 0.01        # clear positive drift
+    assert bootstrap_mean_test(noise - noise.mean(), trials=200).p_value > 0.2     # no drift
+    assert bootstrap_mean_test(noise.iloc[:24 * 5], trials=50).p_value == 1.0     # too short to judge
+
+
+def test_carry_always_on_holds_every_pair_and_uses_the_bootstrap_gate():
+    from trader.strategies.base import Strategy
+    from trader.strategies.ideas import CarryAlwaysOn, FundingHarvest
+    assert CarryAlwaysOn.always_on and not FundingHarvest.always_on and not Strategy.always_on

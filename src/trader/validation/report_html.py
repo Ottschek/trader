@@ -125,6 +125,16 @@ def _usd(v) -> str:
     return f"${v / 1e9:.1f} billion" if v >= 1e9 else f"${v / 1e6:.1f} million" if v >= 1e6 else f"${v:,.0f}"
 
 
+def _test5_text(card) -> str:
+    re_ = card.random_entry
+    if re_.get("method") == "bootstrap":
+        return (f'<h2>Return-above-zero test</h2><p class="muted">Always invested, so there is no timing to shuffle: its daily '
+                f'returns with the average removed were resampled in 5-day blocks {re_["trials"]} times. '
+                f'p = {re_["p_value"]:.3f}: share of no-edge resamples that did at least as well.</p>')
+    return (f'<h2>Random-timing test</h2><p class="muted">The strategy\'s in-market periods shuffled '
+            f'{re_["trials"]} times. p = {re_["p_value"]:.3f}: share of shuffles that did at least as well.</p>')
+
+
 def _capacity_line(card) -> str:
     c = getattr(card, "capacity", None) or {}
     if not c.get("trades"):
@@ -203,8 +213,7 @@ walk-forward {card.train_years * 12:.0f}-month train / {card.test_months}-month 
 <section class="card"><h2>Out-of-sample metrics</h2><div class="tw"><table><thead><tr><th></th><th class="num">Strategy</th>
 <th class="num">Hold {escape(card.benchmark)}</th></tr></thead><tbody>{_metrics_rows(card)}</tbody></table></div>
 {_capacity_line(card)}</section>
-<section class="card"><h2>Random-timing test</h2><p class="muted">The strategy's in-market periods shuffled
-{card.random_entry["trials"]} times. p = {card.random_entry["p_value"]:.3f}: share of shuffles that did at least as well.</p>
+<section class="card">{_test5_text(card)}
 {_random_svg(card.random_sharpes, card.random_entry["strategy_sharpe"])}</section>
 <section class="card"><h2>Walk-forward folds</h2><p class="muted">{card.trials} parameter sets tried this run
 ({getattr(card, "effective_trials", card.trials):.1f} effective) · {card.total_trials} trials in the ledger

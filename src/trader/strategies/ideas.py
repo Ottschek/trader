@@ -195,3 +195,21 @@ class FundingHarvest(Strategy):
             on = (annual > self.params["min_annual"]) & has_history(f, window)
             out[s] = once_a_day(on.astype(float), stock=False) * w
         return pd.DataFrame(out).reindex(data.index)
+
+
+class CarryAlwaysOn(Strategy):
+    """Cash-and-carry with no timing: hold every carry pair (spot long + perp short) all the time,
+    equal weight. Designed 2026-10-19 after funding_harvest's research run showed its funding filter
+    timed *worse* than random (p = 0.994), so the edge, if any, is being in carry, not when. This is
+    what the live carry simulation runs. Validated with the always-on version of test 5."""
+    name = "carry_always_on"
+    bars = "carry"
+    always_on = True
+    default_grid = {"hold": [1]}
+
+    def __init__(self, symbols, hold: int = 1):
+        super().__init__(symbols, hold=hold)
+
+    def target_weights(self, data: MarketData) -> pd.DataFrame:
+        w = 1.0 / len(self.symbols)
+        return pd.DataFrame({s: data.close[s].notna().astype(float) * w for s in self.symbols}, index=data.index)

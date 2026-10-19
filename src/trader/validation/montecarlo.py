@@ -73,3 +73,26 @@ def random_entry_test(targets: pd.DataFrame, data: MarketData, cost_bps: dict[st
         sharpes[i] = annualized_sharpe(approx_returns(shuffled, returns, cost), bpy)
     p = (1 + int((sharpes >= actual - 1e-12).sum())) / (1 + trials)
     return RandomEntryResult(actual, sharpes, p)
+
+
+def bootstrap_mean_test(returns: pd.Series, trials: int = 500, block_days: int = 5, seed: int = 0) -> RandomEntryResult:
+    """For strategies that are always invested (no timing to shuffle): is the average return reliably
+    above zero? Daily returns are demeaned (the "no edge" world) and resampled in blocks of
+    `block_days` consecutive days, which keeps their short-term clustering. p = share of resampled
+    Sharpes at least as high as the real one (+1 smoothing)."""
+    daily = (1 + returns.fillna(0)).groupby(returns.index.tz_convert("UTC").normalize()).prod() - 1
+    r = daily.to_numpy()
+    n = len(r)
+    if n < 2 * block_days:
+        return RandomEntryResult(0.0, np.zeros(trials), 1.0)
+    actual = annualized_sharpe(r, 365)
+    centred = r - r.mean()
+    rng = np.random.default_rng(seed)
+    blocks = int(np.ceil(n / block_days))
+    sharpes = np.empty(trials)
+    for i in range(trials):
+        starts = rng.integers(0, n - block_days + 1, blocks)
+        sample = np.concatenate([centred[s:s + block_days] for s in starts])[:n]
+        sharpes[i] = annualized_sharpe(sample, 365)
+    p = (1 + int((sharpes >= actual - 1e-12).sum())) / (1 + trials)
+    return RandomEntryResult(actual, sharpes, p)

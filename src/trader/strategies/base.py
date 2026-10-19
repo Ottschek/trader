@@ -24,6 +24,8 @@ class Strategy:
     bars = "hourly"                      # "daily" -> validated on the broad daily-bar stock universe
     cost_venue: str | None = None        # every trade pays this venue's costs (strategies that only trade liquid names)
     allow_short = False                  # negative weights allowed (validated with shorts in every backtest)
+    always_on = False                    # invested all the time by design: test 5 checks the return is above zero
+                                         # (block bootstrap) instead of shuffling a timing it doesn't have
 
     def __init__(self, symbols, **params):
         self.symbols = list(symbols)

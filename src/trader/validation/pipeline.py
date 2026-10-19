@@ -29,7 +29,7 @@ from trader.ledger import ledger
 from trader.strategies.examples import BuyAndHold
 from trader.validation import holdout as ho
 from trader.validation.deflated import average_correlation, deflated_sharpe, effective_trials
-from trader.validation.montecarlo import random_entry_test
+from trader.validation.montecarlo import bootstrap_mean_test, random_entry_test
 from trader.validation.walkforward import param_combos, walk_forward
 
 LOOKAHEAD_CUTS = 6
@@ -155,8 +155,14 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
                       BuyAndHold([bench]).target_weights(data), allow_short=strategy_cls.allow_short)
     oos, boos = summarize(wf.oos), summarize(wf.benchmark_oos)
 
-    # 5. random entry, on the out-of-sample record
-    rnd = random_entry_test(wf.oos_targets, data, costs, trials=v.random_trials, seed=seed)
+    # 5. random entry, on the out-of-sample record; strategies that are always invested by design
+    #    have no timing to shuffle, so for them: is the out-of-sample return reliably above zero?
+    if strategy_cls.always_on:
+        rnd = bootstrap_mean_test(wf.oos.returns, trials=v.random_trials, seed=seed)
+        test5 = ("Return above zero", "bootstrap")
+    else:
+        rnd = random_entry_test(wf.oos_targets, data, costs, trials=v.random_trials, seed=seed)
+        test5 = ("Beats random timing", "shuffled timing")
 
     # 6. deflated Sharpe, counting every trial ever run (as independent trials: correlated
     #    variants of one idea count less, N_eff = rho + (1 - rho) * N)
@@ -173,7 +179,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
              f"{oos['sharpe']:.2f} vs {boos['sharpe']:.2f}", f"> hold {bench}"),
         Gate("drawdown", "Max drawdown", oos["max_drawdown"] >= -v.max_oos_drawdown,
              f"{oos['max_drawdown']:.1%}", f">= -{v.max_oos_drawdown:.0%}"),
-        Gate("random_entry", "Beats random timing", rnd.p_value <= v.max_p_value,
+        Gate("random_entry", test5[0], rnd.p_value <= v.max_p_value,
              f"p = {rnd.p_value:.3f}", f"<= {v.max_p_value:.2f}"),
         Gate("deflated", "Deflated Sharpe", dsr.probability >= v.min_deflated_sharpe,
              f"{dsr.probability:.2f} ({dsr.trials} eff. trials)", f">= {v.min_deflated_sharpe:.2f}"),
@@ -202,7 +208,7 @@ def validate(strategy_cls, symbols, settings: Settings, grid: dict | None = None
         random_entry={"strategy_sharpe": round(rnd.strategy_sharpe, 4), "p_value": round(rnd.p_value, 4),
                       "random_median": round(float(pd.Series(rnd.random_sharpes).median()), 4),
                       "random_p95": round(float(pd.Series(rnd.random_sharpes).quantile(0.95)), 4),
-                      "trials": int(len(rnd.random_sharpes))},
+                      "trials": int(len(rnd.random_sharpes)), "method": test5[1]},
         deflated={"probability": round(dsr.probability, 4), "sharpe_per_bar": round(dsr.sharpe, 6),
                   "expected_max_per_bar": round(dsr.expected_max, 6), "trials": dsr.trials, "bars": dsr.bars},
         lookahead_problems=problems[:20], capacity=capacity,
