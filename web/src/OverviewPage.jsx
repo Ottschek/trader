@@ -43,6 +43,8 @@ export function overview(health, lab, paper, now = Date.now()) {
   const entries = paper.decisions.filter((d) => d.kind === "entry").length;
 
   const carry = paper.carry.at(-1) ?? null;
+  const revEq = paper.reversal?.equity ?? [];
+  const revWeeks = (paper.reversal?.weeks ?? []).filter((w) => w.complete).length;
   const signals = paper.news?.signals ?? [];
   const lex = signals.filter((s) => s.source === "lexicon");
   const llmRuns = paper.news?.runs ?? [];
@@ -52,6 +54,7 @@ export function overview(health, lab, paper, now = Date.now()) {
     research: { runs: exps.length, passed: passed.length, trials, recent: exps.slice(0, 5) },
     paper: { equity: eq.at(-1)?.equity ?? null, ret: paperRet, since: eq[0]?.ts ?? null, entries,
              open: paper.state.open_trade ?? null, halted: paper.state.halted ?? null },
+    reversal: { ret: revEq.length ? revEq.at(-1).equity - 1 : null, weeks: revWeeks },
     carry: carry && { ret: carry.equity / 100000 - 1, model: carry.model_equity / 100000 - 1, since: paper.carry[0].ts },
     news: { lex: lex.length, lexScored: lex.filter((s) => s.net_1d != null).length, lexAvg: avg(lex.map((s) => s.net_1d)),
             llmOn: llmRuns.length > 0 },
@@ -67,7 +70,7 @@ function Overview({ health, lab, paper }) {
     <>
       <section className="card overview-banner">
         <h2>Research only, no real money</h2>
-        <p className="muted">{verdict} Meanwhile three shadow experiments collect forward evidence with fake money.</p>
+        <p className="muted">{verdict} Meanwhile four shadow experiments collect forward evidence with fake money.</p>
       </section>
 
       <div className="tiles tiles-5">
@@ -97,6 +100,9 @@ function Overview({ health, lab, paper }) {
               <tr><td className="exp-name">Carry simulation<span className="muted small">$100k virtual · since {o.carry ? shortDate(o.carry.since) : "—"}</span></td>
                 <td className="small">Long spot + short perp in 10 coins, collecting funding</td>
                 <td className="num">{o.carry ? pct(o.carry.ret, 2) : "—"}<span className="muted small">{o.carry ? ` · model ${pct(o.carry.model, 2)}` : ""}</span></td></tr>
+              <tr><td className="exp-name">Weekly reversal<span className="muted small">simulation · since 19 Oct 2026</span></td>
+                <td className="small">Every Friday: long the 50 biggest losers, short the 50 biggest winners (liquid stocks)</td>
+                <td className="num">{pct(o.reversal.ret, 2)}<span className="muted small"> · {o.reversal.weeks} week(s)</span></td></tr>
               <tr><td className="exp-name">News word list<span className="muted small">since 19 Oct 2026</span></td>
                 <td className="small">News-event words in headlines, 27 assets, every 6 hours</td>
                 <td className="num">{o.news.lex} signal(s)<span className="muted small">{o.news.lexScored ? ` · 1-day ${pct(o.news.lexAvg, 2)}` : ""}</span></td></tr>

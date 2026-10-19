@@ -284,6 +284,10 @@ insider and hype data, more crazy ideas — all through the same funnel.
   large-cap costs. Rejected, but the closest call so far: OOS Sharpe 0.78 (SPY 0.76), 17.4% a year, timing
   p = 0.004; fails Sharpe >= 1, drawdown (−29.3%) and the deflated Sharpe (0.26 at ~495 effective trials).
   Costs 4.2% a year; borrow fees not modeled.
+- **weekly_reversal forward shadow** (simulation, fake money, no orders, from 2026-10-19): every weekend a GitHub
+  workflow downloads a fresh daily window for the whole universe (one download, so splits can't create fake jumps),
+  runs the committed strategy with the walk-forward's latest parameters (20-day lookback, 50 a side) and stores
+  equity and weekly books in D1. Shown on the Paper tab against the backtest's 17.4% a year.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog

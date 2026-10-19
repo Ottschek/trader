@@ -223,6 +223,60 @@ function NewsSignals({ news }) {
   );
 }
 
+const REVERSAL_BACKTEST_CAGR = 0.1741;   // ledger 19762903b577, out-of-sample 2018-2024
+
+function ReversalShadow({ rev }) {
+  const eq = rev?.equity ?? [], weeks = rev?.weeks ?? [];
+  const head = (
+    <div className="card-head">
+      <h2>Weekly reversal: losers long, winners short</h2>
+      <span className="muted">simulation · $100k virtual · no orders · frozen rules since 19 Oct 2026</span>
+    </div>
+  );
+  const about = (
+    <p className="muted small">Rejected in research but the closest call so far (Sharpe 0.78, drawdown −29%, timing p = 0.004).
+      Every Friday: buy the 50 liquid stocks that fell most over 20 trading days, short the 50 that rose most, 50/50,
+      held a week, large-cap costs. Recomputed every weekend from a fresh price download.</p>
+  );
+  if (weeks.length === 0) {
+    return <section className="card">{head}<p className="muted">First book is chosen on Friday 23 Oct (filled Monday 26 Oct); results appear after the weekend run.</p>{about}</section>;
+  }
+  const last = eq.at(-1);
+  const days = eq.length > 1 ? (Date.parse(last.ts) - Date.parse(eq[0].ts)) / 86400000 : 0;
+  const ret = last ? last.equity - 1 : null;
+  const expected = eq.map((p) => [p.ts, (1 + REVERSAL_BACKTEST_CAGR) ** ((Date.parse(p.ts) - Date.parse(eq[0].ts)) / 86400000 / 365)]);
+  const done = weeks.filter((w) => w.complete);
+  const winners = done.filter((w) => w.ret > 0).length;
+  const names = (xs) => xs.slice(0, 6).map(([s, r]) => `${s} ${pct(r, 0)}`).join(", ") + (xs.length > 6 ? ` +${xs.length - 6}` : "");
+  return (
+    <section className="card">
+      {head}
+      <div className="mini-stats">
+        <div><span className="muted small">Simulated return</span><strong>{pct(ret, 2)}</strong></div>
+        <div><span className="muted small">Backtest pace</span><strong>{pct(expected.at(-1)?.[1] - 1, 2)}</strong><span className="muted small">17.4% a year</span></div>
+        <div><span className="muted small">Weeks</span><strong>{done.length}</strong><span className="muted small">{done.length ? `${winners} up · ${done.length - winners} down` : "first week open"}</span></div>
+        <div><span className="muted small">Running</span><strong>{Math.round(days)} days</strong></div>
+      </div>
+      <EquityChart points={eq.map((p) => ({ ts: p.ts, equity: p.equity * 100000 }))}
+                   expected={expected.map(([ts, v]) => [ts, v * 100000])} />
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>Decided (Fri)</th><th>Long: biggest losers</th><th>Short: biggest winners</th><th className="num">Week</th></tr></thead>
+          <tbody>
+            {weeks.slice(0, 12).map((w) => (
+              <tr key={w.decided}>
+                <td>{w.decided}</td><td className="small">{names(w.longs)}</td><td className="small">{names(w.shorts)}</td>
+                <td className="num">{w.ret == null ? "open" : pct(w.ret, 2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {about}
+    </section>
+  );
+}
+
 function Plan({ plan }) {
   if (!plan) return null;
   return (
@@ -334,6 +388,7 @@ function Paper({ data }) {
       </section>
       <LiveVsBacktest r={data.reconcile} />
       <CarrySim rows={data.carry} />
+      <ReversalShadow rev={data.reversal} />
       <NewsSignals news={data.news} />
       <Plan plan={data.plan} />
       <Decisions decisions={data.decisions} />

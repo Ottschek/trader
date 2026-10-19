@@ -46,8 +46,8 @@ def update_daily_bars(symbols: list[str], start: str, end: str, secrets: AlpacaS
     return added
 
 
-def _fetch(client, todo: list[str], start: str, end: str, log) -> int:
-    added = 0
+def _batches(client, todo: list[str], start: str, end: str, log):
+    """Yield one DataFrame of daily bars per batch of symbols (failed batches are logged and skipped)."""
     for i in range(0, len(todo), BATCH):
         batch = todo[i:i + BATCH]
         try:
@@ -60,13 +60,33 @@ def _fetch(client, todo: list[str], start: str, end: str, log) -> int:
             continue
         df = res.df.reset_index().rename(columns={"timestamp": "ts"})[["ts", "symbol", "open", "high", "low", "close", "volume"]]
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
+        yield min(i + BATCH, len(todo)), df
+
+
+def _fetch(client, todo: list[str], start: str, end: str, log) -> int:
+    added = 0
+    for done, df in _batches(client, todo, start, end, log):
         added += upsert(daily_path(), df, key=["ts", "symbol"])
-        log(f"  daily: {min(i + BATCH, len(todo))}/{len(todo)} symbols, +{len(df):,} bars")
+        log(f"  daily: {done}/{len(todo)} symbols, +{len(df):,} bars")
     return added
 
 
-def load_daily(symbols, start=None, end=None, clean: bool = True) -> MarketData:
-    all_bars = read(daily_path())
+def fetch_window(symbols: list[str], start: str, end: str, secrets: AlpacaSecrets, log=print) -> pd.DataFrame:
+    """Daily bars for a window, downloaded in one go and NOT stored: every price in it carries the
+    same corporate-action adjustments (a split between two refreshes can't create a fake jump)."""
+    client = StockHistoricalDataClient(secrets.api_key, secrets.secret_key)
+    todo = sorted({alpaca_symbol(s) for s in symbols})
+    frames = []
+    for done, df in _batches(client, todo, start, end, log):
+        frames.append(df)
+        if done % 2000 < BATCH or done == len(todo):
+            log(f"  window: {done}/{len(todo)} symbols")
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def load_daily(symbols, start=None, end=None, clean: bool = True, bars: pd.DataFrame | None = None) -> MarketData:
+    """Daily MarketData from the stored file (or from `bars`, e.g. a fetch_window download)."""
+    all_bars = read(daily_path()) if bars is None else bars
     if all_bars.empty:
         raise ValueError("no daily bars stored")
     if start is not None:

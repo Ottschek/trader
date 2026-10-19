@@ -7,6 +7,10 @@ on:
     - cron: "23 4 3 * *"     # 3rd of each month, 04:23 UTC
   workflow_dispatch:
 
+concurrency:
+  group: research-data     # shares data/daily with the weekly shadow
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

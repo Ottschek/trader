@@ -91,7 +91,9 @@ test("weekly report includes the news analyst once it has run", () => {
     decisions: [], openTrade: null, halted: null, recon: null, runs: [], failingNow: [], oiCount: 0,
     experiments: [], totalTrials: 0, dashboard: "https://example.pages.dev",
   };
-  const text = formatWeekly({ ...base, news: { runs: 28, signals: 5, cost: 1.234, scored: 4, avgNet: 0.0031, hitRate: 0.75 } });
+  const text = formatWeekly({ ...base, news: { runs: 28, signals: 5, cost: 1.234, scored: 4, avgNet: 0.0031, hitRate: 0.75 },
+                              reversal: { equity: 1.012, weeks: 2, lastWeek: -0.004 } });
+  assert.match(text, /\+1\.20% since 19 Oct over 2 finished week\(s\) · last week -0\.40%/);
   assert.match(text, /28 run\(s\), 5 signal\(s\), \$1\.23 spent/);
   assert.match(text, /4, avg 1-day net excess \+0\.31%, 75% winners/);
   assert.match(formatWeekly({ ...base, news: { runs: 2, signals: 0, cost: 0.1, scored: 0, avgNet: null, hitRate: null } }),
