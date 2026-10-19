@@ -26,7 +26,7 @@ def research_end(v: ValidationSettings) -> pd.Timestamp:
 def _load(crypto, stocks, start, end, daily=False, carry=False, spot=(), **kwargs) -> MarketData:
     if carry:   # funding-harvest pairs (backtest/carry.py), plus spot coins for the benchmark
         from trader.backtest.carry import load_carry
-        return load_carry([c for c in crypto if c not in spot], start=start, end=end, spot=spot)
+        return load_carry(list(crypto), start=start, end=end, spot=spot)
     if daily:   # broad daily-bar stock universe (data/daily.py)
         from trader.data.daily import load_daily
         return load_daily(list(stocks) + list(crypto), start=start, end=end)
