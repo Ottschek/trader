@@ -15,6 +15,7 @@ import argparse
 import sys
 
 from trader.config import load_settings
+from trader.strategies.altdata import AttentionFilter, StablecoinPrinter
 from trader.strategies.baselines import DipBuyer, RegimeFilter, TsMomentum
 from trader.strategies.examples import RandomEntry, SmaCross
 from trader.strategies.earnings import EarningsDrift
@@ -28,7 +29,8 @@ from trader.validation.pipeline import validate
 STRATEGIES = {"sma": SmaCross, "random": RandomEntry, "momentum": TsMomentum, "dip": DipBuyer,
               "regime": RegimeFilter, "weekend": WeekendGap, "weekend_sized": WeekendGapSized,
               "funding": FundingContrarian, "combo": ComboSleeves, "insider": InsiderCluster,
-              "earnings": EarningsDrift, "harvest": FundingHarvest}
+              "earnings": EarningsDrift, "harvest": FundingHarvest,
+              "stablecoins": StablecoinPrinter, "attention": AttentionFilter}
 
 
 def _value(text: str):

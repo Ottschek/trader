@@ -217,3 +217,36 @@ def test_carry_pairs_and_funding_harvest():
     assert check_no_lookahead(strat, data) == []
     r = run_backtest(data, strat.target_weights(data), {"BTC/USD": 40.0, "BTC/USD spot": 32.5})
     assert r.equity.iloc[-1] > 1.0                                         # earned funding, paid two trades of costs
+
+
+# --- alternative data ideas --------------------------------------------------------
+
+def test_stablecoin_printer_uses_supply_only_after_it_is_published():
+    from trader.strategies.altdata import StablecoinPrinter
+    crypto_walk("BTC/USD", start="2023-01-01", days=60, seed=13)
+    data = load_market(crypto=["BTC/USD"])
+    days = pd.date_range("2022-12-20", "2023-03-05", freq="D", tz="UTC")
+    supply = pd.Series(100.0, index=days)
+    supply[days >= pd.Timestamp("2023-02-01", tz="UTC")] = 103.0          # +3% printed on Feb 1
+    strat = StablecoinPrinter(["BTC/USD"], threshold=0.02, hold_days=7, supply=supply)
+    w = strat.target_weights(data)["BTC/USD"]
+    held = w[w > 0].index
+    assert held.min() == pd.Timestamp("2023-02-02", tz="UTC")              # known one day later
+    assert held.max() < pd.Timestamp("2023-02-15", tz="UTC")               # last signal day + 7 days
+    assert check_no_lookahead(strat, data) == []
+
+
+def test_attention_filter_steps_aside_after_a_hype_spike():
+    from trader.strategies.altdata import AttentionFilter
+    crypto_walk("AAA/USD", start="2023-01-01", days=200, seed=14)
+    data = load_market(crypto=["AAA/USD"])
+    days = pd.date_range("2022-09-01", "2023-07-20", freq="D", tz="UTC")
+    views = pd.Series(1000.0, index=days)
+    views[(days >= pd.Timestamp("2023-04-01", tz="UTC")) & (days < pd.Timestamp("2023-04-08", tz="UTC"))] = 9000.0
+    vdf = pd.DataFrame({"ts": days, "symbol": "AAA/USD", "views": views.to_numpy()})
+    strat = AttentionFilter(["AAA/USD"], spike=2.0, cash_days=7, views=vdf)
+    w = strat.target_weights(data)["AAA/USD"]
+    out = w[w == 0].index
+    assert out.min() >= pd.Timestamp("2023-04-03", tz="UTC")               # spike known 2 days after it starts
+    assert w.loc["2023-03-15"].min() == 1.0 and w.loc["2023-06-01"].min() == 1.0
+    assert check_no_lookahead(strat, data) == []
