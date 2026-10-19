@@ -6,6 +6,7 @@ from __future__ import annotations
 from html import escape
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from trader.data import quality as q
 from trader.data.store import data_dir
@@ -15,6 +16,9 @@ KEEP_CHECK_DAYS = 30
 
 
 # --- dataset status (what the data health page shows) ------------------------
+
+TIME_COLUMNS = ("ts", "decided_at")   # the first one a file has is its time column
+
 
 def dataset_status_rows(now: pd.Timestamp) -> list[tuple]:
     """One row per stored Parquet file: kind, source, symbol, rows, first/last timestamp."""
@@ -29,7 +33,14 @@ def dataset_status_rows(now: pd.Timestamp) -> list[tuple]:
         else:
             source = parts[1] if kind in ("bars", "funding") else ("hyperliquid" if kind == "snapshots" else "alpaca")
             symbol = parts[2] if kind in ("bars", "funding") else None
-        ts = pd.read_parquet(path, columns=["ex_date" if kind == "corporate_actions" else "ts"]).iloc[:, 0]
+        names = pq.read_schema(path).names
+        preferred = ("ex_date",) if kind == "corporate_actions" else TIME_COLUMNS
+        column = next((c for c in preferred if c in names), None)
+        if column is None:              # no time column: still list the file, with its row count
+            n = pq.read_metadata(path).num_rows
+            rows.append((rel, kind, source, symbol, n, None, None, now.isoformat()))
+            continue
+        ts = pd.read_parquet(path, columns=[column]).iloc[:, 0]
         rows.append((rel, kind, source, symbol, len(ts),
                      ts.min().isoformat() if len(ts) else None,
                      ts.max().isoformat() if len(ts) else None,

@@ -151,3 +151,18 @@ def test_r2_pull_can_be_limited_to_folders(tmp_path):
     assert r2.pull("b", s3, tmp_path, prefixes=r2.COLLECTOR_PREFIXES) == 1
     assert not (tmp_path / "daily").exists()
     assert r2.pull("b", s3, tmp_path, prefixes=r2.RESEARCH_PREFIXES) == 2
+
+
+def test_dataset_status_handles_files_without_a_ts_column(tmp_path, monkeypatch):
+    import pandas as pd
+
+    from trader.monitor.report import dataset_status_rows
+    monkeypatch.setenv("TRADER_DATA_DIR", str(tmp_path))
+    (tmp_path / "alt").mkdir()
+    now = pd.Timestamp("2026-10-19 15:31", tz="UTC")
+    pd.DataFrame({"ts": [now], "x": [1]}).to_parquet(tmp_path / "alt" / "news_headlines.parquet")
+    pd.DataFrame({"decided_at": [now], "symbol": ["JPM"]}).to_parquet(tmp_path / "alt" / "news_lex_signals.parquet")
+    pd.DataFrame({"symbol": ["A", "B"]}).to_parquet(tmp_path / "alt" / "no_time.parquet")
+    rows = {r[0]: r for r in dataset_status_rows(now)}
+    assert rows["alt/news_lex_signals"][4] == 1 and rows["alt/news_lex_signals"][6] == now.isoformat()
+    assert rows["alt/no_time"][4] == 2 and rows["alt/no_time"][5] is None
