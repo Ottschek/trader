@@ -1,0 +1,579 @@
+{
+ "idea": "agent loop: AI fixes losing trades (Instagram reel)",
+ "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+ "evolved_on": [
+  "2016-01-01",
+  "2017-12-31 23:59"
+ ],
+ "symbols": [
+  "BTC/USD",
+  "ETH/USD"
+ ],
+ "start_description": "Hold BTC and ETH while 30-day momentum is positive and price is above its 100-day average.",
+ "evaluated": 21,
+ "evaluated_rules": [
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.0,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.0,
+   "use_vol": 0,
+   "vol_max": 0.05
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.0,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.05
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.05
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.05
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.05
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  },
+  {
+   "use_mom": 1,
+   "mom_days": 30,
+   "mom_min": 0.05,
+   "use_sma": 1,
+   "sma_days": 100,
+   "sma_ratio": 1.05,
+   "use_vol": 1,
+   "vol_max": 0.06
+  }
+ ],
+ "survivors": [
+  {
+   "genes": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.0,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.0,
+    "use_vol": 0,
+    "vol_max": 0.05
+   },
+   "in_sample_sharpe": 2.746
+  }
+ ],
+ "transcript": [
+  {
+   "round": 0,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.0,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.0,
+    "use_vol": 0,
+    "vol_max": 0.05
+   },
+   "why": "Hold BTC and ETH while 30-day momentum is positive and price is above its 100-day average.",
+   "in_sample_sharpe": 2.746,
+   "kept": true
+  },
+  {
+   "round": 1,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increasing momentum and sma ratio thresholds and adding volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 2,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 3,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.0,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increasing momentum threshold and adding volatility condition to filter out low-momentum and high-volatility trades",
+   "in_sample_sharpe": 2.603,
+   "kept": false
+  },
+  {
+   "round": 4,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 5,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 6,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.05
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 1.994,
+   "kept": false
+  },
+  {
+   "round": 7,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.05
+   },
+   "why": "increased momentum and sma ratio thresholds and added volatility condition to filter out low-momentum and high-volatility trades",
+   "in_sample_sharpe": 1.994,
+   "kept": false
+  },
+  {
+   "round": 8,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.05
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 1.994,
+   "kept": false
+  },
+  {
+   "round": 9,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and sma ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 10,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 11,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 12,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 13,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and sma ratio thresholds and added volatility condition to filter out low-momentum and high-volatility trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 14,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and sma ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 15,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.05
+   },
+   "why": "increased momentum and sma ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 1.994,
+   "kept": false
+  },
+  {
+   "round": 16,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 17,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 18,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and sma ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 19,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  },
+  {
+   "round": 20,
+   "rule": {
+    "use_mom": 1,
+    "mom_days": 30,
+    "mom_min": 0.05,
+    "use_sma": 1,
+    "sma_days": 100,
+    "sma_ratio": 1.05,
+    "use_vol": 1,
+    "vol_max": 0.06
+   },
+   "why": "increased momentum and SMA ratio thresholds and added volatility condition to filter out losing trades",
+   "in_sample_sharpe": 2.683,
+   "kept": false
+  }
+ ]
+}
