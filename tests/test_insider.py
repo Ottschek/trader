@@ -88,3 +88,18 @@ def test_earnings_drift_buys_after_a_big_excess_reaction_only():
     assert str(held[0]) == str(idx[60].date()) and len(held) == 10     # target on the reaction day -> next open
     assert w["MEH"].sum() == 0 and "SPY" not in w.columns
     assert check_no_lookahead(strat, data) == []
+
+
+def test_earnings_release_on_the_last_bar_day_is_seen_consistently():
+    # regression: a pre-open release on day D must count for D's bar even when D is the last bar
+    idx = write_daily(["WIN", "SPY"], days=80)
+    df = pd.read_parquet(daily_path())
+    for k in range(20, 70, 5):               # many releases, several on would-be cut days
+        day = pd.Timestamp(f"{idx[k].date()} 00:00", tz="America/New_York").tz_convert("UTC")
+        df.loc[(df["symbol"] == "WIN") & (df["ts"] >= day), ["open", "high", "low", "close"]] *= 1.08
+    df.to_parquet(daily_path(), index=False)
+    data = load_daily(["WIN", "SPY"])
+    acc = [pd.Timestamp(f"{idx[k].date()} 07:00", tz="America/New_York").tz_convert("UTC") for k in range(20, 70, 5)]
+    events = pd.DataFrame({"symbol": "WIN", "accepted": acc, "accession": [str(i) for i in range(len(acc))]})
+    strat = EarningsDrift(["WIN", "SPY"], threshold=0.05, hold_days=3, events=events)
+    assert check_no_lookahead(strat, data, n_cuts=40) == []
