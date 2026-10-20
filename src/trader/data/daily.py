@@ -111,3 +111,31 @@ def load_daily(symbols, start=None, end=None, clean: bool = True, bars: pd.DataF
         gap=frames["gap"].fillna(0.0), intra=frames["intra"].fillna(0.0), tradable=frames["close"].notna(),
         venue={s: VENUE for s in frames["close"].columns}, cleaned=cleaned, raw_close=frames["raw_close"],
     )
+
+
+def monthly_raw_path():
+    return data_dir() / "daily" / "monthly_raw.parquet"
+
+
+def update_monthly_raw(symbols: list[str], start: str, end: str, secrets: AlpacaSecrets, log=print) -> int:
+    """Monthly closes WITHOUT split/dividend adjustment, for market caps: a filing's share count is
+    as of its date, so it has to be multiplied by the price of that time (an adjusted price would
+    be divided by every later split). Stored long: ts (month start), symbol, close, volume."""
+    client = StockHistoricalDataClient(secrets.api_key, secrets.secret_key)
+    todo = sorted({alpaca_symbol(s) for s in symbols})
+    added = 0
+    for i in range(0, len(todo), BATCH):
+        batch = todo[i:i + BATCH]
+        try:
+            res = client.get_stock_bars(StockBarsRequest(symbol_or_symbols=batch, timeframe=TimeFrame.Month, start=start,
+                                                         end=end, adjustment=Adjustment.RAW, feed=DataFeed.SIP))
+        except Exception as e:  # noqa: BLE001
+            log(f"  monthly batch {i // BATCH + 1}: {type(e).__name__}: {str(e)[:120]}")
+            continue
+        if res.df.empty:
+            continue
+        df = res.df.reset_index().rename(columns={"timestamp": "ts"})[["ts", "symbol", "close", "volume"]]
+        df["ts"] = pd.to_datetime(df["ts"], utc=True)
+        added += upsert(monthly_raw_path(), df, key=["ts", "symbol"])
+    log(f"  monthly raw closes: +{added:,} rows for {len(todo):,} symbols")
+    return added

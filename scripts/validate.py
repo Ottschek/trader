@@ -20,6 +20,7 @@ from trader.strategies.baselines import DipBuyer, RegimeFilter, TsMomentum
 from trader.strategies.examples import RandomEntry, SmaCross
 from trader.strategies.earnings import EarningsDrift
 from trader.strategies.overnight import OvernightHold
+from trader.strategies.quality_value import QualityValue
 from trader.strategies.reversal import WeeklyReversal
 from trader.strategies.turn_of_month import TurnOfMonth
 from trader.strategies.insider import InsiderCluster, InsiderClusterLarge, InsiderClusterSized
@@ -36,7 +37,7 @@ STRATEGIES = {"sma": SmaCross, "random": RandomEntry, "momentum": TsMomentum, "d
               "stablecoins": StablecoinPrinter, "attention": AttentionFilter, "insider_sized": InsiderClusterSized,
               "insider_large": InsiderClusterLarge, "reversal": WeeklyReversal,
               "overnight": OvernightHold, "turn_of_month": TurnOfMonth,
-              "carry_always_on": CarryAlwaysOn}
+              "carry_always_on": CarryAlwaysOn, "quality_value": QualityValue}
 
 
 def _value(text: str):
