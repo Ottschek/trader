@@ -125,7 +125,7 @@ def render(s: dict, comment: str | None, comment_status: str, path) -> str:
     if not len(s["news"]):
         nw.text(0, 0.6, "no recent headlines", transform=nw.transAxes, fontsize=8, color=R.TEXT3, va="top")
     ai = R.card(fig, (0.04, 0.03, 0.92, 0.09), "AI comment (fact-checked)" if comment else "AI comment")
-    ai.text(0, 0.62, R.wrap(comment or comment_status, 108), transform=ai.transAxes, fontsize=8.3,
+    ai.text(0, 0.66, R.wrap(comment or comment_status, 118), transform=ai.transAxes, fontsize=7.8,
             color=R.TEXT if comment else R.TEXT3, va="top")
     R.footer(fig, "Data: Alpaca, Hyperliquid, Wikipedia, DefiLlama, news feeds · Not financial advice")
     return R.save(fig, path)

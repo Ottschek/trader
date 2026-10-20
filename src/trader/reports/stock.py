@@ -283,14 +283,14 @@ def render(info: dict, s: dict, comment: str | None, comment_status: str, path) 
             transform=nw.transAxes, fontsize=7.8, color=R.TEXT2, va="top")
     news = s["news"]
     for i, t in enumerate(news["title"].head(4) if len(news) else []):
-        nw.text(0, 0.62 - i * 0.17, "• " + (t if len(t) <= 60 else t[:58].rstrip() + "…"), transform=nw.transAxes,
+        nw.text(0, 0.62 - i * 0.17, "• " + (t if len(t) <= 52 else t[:50].rstrip() + "…"), transform=nw.transAxes,
                 fontsize=7.8, color=R.TEXT, va="top")
     if not len(news):
         nw.text(0, 0.6, "no recent headlines", transform=nw.transAxes, fontsize=8, color=R.TEXT3, va="top")
 
     # AI comment
     ai = R.card(fig, (0.04, 0.03, 0.92, 0.085), "AI comment (fact-checked)" if comment else "AI comment")
-    ai.text(0, 0.62, R.wrap(comment or comment_status, 108), transform=ai.transAxes, fontsize=8.3,
+    ai.text(0, 0.66, R.wrap(comment or comment_status, 118), transform=ai.transAxes, fontsize=7.8,
             color=R.TEXT if comment else R.TEXT3, va="top")
     R.footer(fig, "Data: SEC filings, Alpaca, Yahoo Finance · Scores are percentiles, not advice · Not financial advice")
     return R.save(fig, path)
