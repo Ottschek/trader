@@ -45,6 +45,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         fundamentals.update_fundamentals(earnings_universe(1500), Path(tmp) / "companyfacts.zip")
     daily.update_monthly_raw(sorted(set(universe["symbol"])) + ["SPY"], "2015-01-01", now.strftime("%Y-%m-%d"), load_alpaca_secrets())
+    print("Industry codes for new companies (peer groups in /analise reports):")
+    sec.update_company_info(sorted(set(universe["cik"].astype(int))))
     if args.cloud:
         print(f"Pushed {r2.push(bucket)} changed files to R2")
     return 0

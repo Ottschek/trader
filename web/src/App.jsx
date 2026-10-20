@@ -3,12 +3,14 @@ import HealthPage from "./HealthPage.jsx";
 import LabPage from "./LabPage.jsx";
 import OverviewPage from "./OverviewPage.jsx";
 import PaperPage from "./PaperPage.jsx";
+import ReportsPage from "./ReportsPage.jsx";
 
 const PAGES = [
   ["#/", "Overview", OverviewPage],
   ["#/health", "Data health", HealthPage],
   ["#/lab", "Strategy lab", LabPage],
   ["#/paper", "Paper", PaperPage],
+  ["#/reports", "Reports", ReportsPage],
 ];
 
 function useHash() {

@@ -202,3 +202,33 @@ def update_earnings_8k(companies: pd.DataFrame, since: str = "2016-01-01", log=p
     flush()
     log(f"  8-K: +{added} earnings filings; {len(done)} companies done, {failed} failed (rerun to retry)")
     return added
+
+
+# --- company info (industry codes, for peer groups) -------------------------------------------
+
+def company_info_path() -> Path:
+    return sec_path("company_info.parquet")
+
+
+def update_company_info(ciks: list[int], log=print, refresh: bool = False) -> int:
+    """SEC industry code (SIC) and official name per company, from the submissions API."""
+    from trader.data.store import read, upsert
+    have = read(company_info_path())
+    done = set() if refresh or have.empty else set(have["cik"])
+    todo = [c for c in ciks if c not in done]
+    rows = []
+    for k, cik in enumerate(todo):
+        try:
+            r = sec_get(f"https://data.sec.gov/submissions/CIK{cik:010d}.json", timeout=30)
+        except requests.RequestException:
+            continue                     # skipped now, picked up by the next run
+        if r.status_code == 200:
+            d = r.json()
+            rows.append({"cik": cik, "name": d.get("name"), "sic": str(d.get("sic") or ""),
+                         "sic_description": d.get("sicDescription") or "", "exchange": ",".join(d.get("exchanges") or [])})
+        if len(rows) >= 200 or k == len(todo) - 1:
+            if rows:
+                upsert(company_info_path(), pd.DataFrame(rows), key=["cik"])
+                rows = []
+            log(f"  company info: {k + 1}/{len(todo)}")
+    return len(todo)

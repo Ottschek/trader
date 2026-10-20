@@ -3,6 +3,7 @@
 import { COINS as CARRY_COINS, initialState as carryInitial, priceSnapshot, step as carryStep } from "./carry.js";
 import { makeAlpaca, telegram as sendTelegram } from "./clients.js";
 import { equitySnapshot, handleCommand, isDecisionTime, morning, paperConfig, refreshOrders, riskCheck } from "./paper.js";
+import { briefingDue, dispatchReport, parseReport, reportCommand } from "./reports.js";
 import { makeStore } from "./store.js";
 import { HOUR, escapeHtml, isoUtc, localTime, parseTs } from "./util.js";
 
@@ -288,6 +289,7 @@ export function jobsAt(now, env) {
   const jobs = [];
   if (now.getUTCMinutes() < 30) jobs.push("snapshot", "watchdog");
   if (summaryDue(now, env)) jobs.push("summary");
+  if (summaryDue(now, env) && env.GITHUB_DISPATCH_TOKEN && briefingDue(localTime(now, env.TIMEZONE))) jobs.push("briefing");
   if (weeklyDue(now, env)) jobs.push("weekly");
   if (env.GITHUB_DISPATCH_TOKEN) jobs.push("kick");
   return jobs;
@@ -312,6 +314,7 @@ async function run(now, env) {
     snapshot: ["open interest snapshot", () => recordSnapshot(env, now)],
     watchdog: ["watchdog", () => watchdog(env, now)],
     summary: ["daily summary", () => sendSummary(env, now)],
+    briefing: ["market briefing", () => dispatchReport(env, fetch, { kind: "news", query: "", when: briefingDue(localTime(now, env.TIMEZONE)) })],
     weekly: ["weekly report", () => sendWeekly(env, now)],
     kick: ["collector kick", () => kickCollector(env, now)],
     paper_orders: ["paper: order updates", () => refreshOrders(paperContext(env, now))],
@@ -347,7 +350,12 @@ async function telegramWebhook(request, env) {
   if (!msg || String(msg.chat?.id) !== String(env.TELEGRAM_CHAT_ID)) return new Response("ok");   // ignore strangers
   let reply;
   try {
-    reply = env.ALPACA_API_KEY ? await handleCommand(paperContext(env, new Date()), msg.text) : "Paper trading isn't configured.";
+    const report = parseReport(msg.text);
+    if (report) {
+      reply = await reportCommand(env, fetch, env.ALPACA_API_KEY ? makeAlpaca(env, fetch) : null, report);
+    } else {
+      reply = env.ALPACA_API_KEY ? await handleCommand(paperContext(env, new Date()), msg.text) : "Paper trading isn't configured.";
+    }
   } catch (err) {
     reply = `Command failed: ${escapeHtml(err.message)}`;
   }

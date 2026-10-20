@@ -339,6 +339,14 @@ insider and hype data, more crazy ideas — all through the same funnel.
 - **AI research desk (layer 2, forward shadow from 2026-10-20)**: each month-end, layer 1's top 20 get a Llama memo
   built only from an SEC fact sheet; every citation and every number is checked, an unbacked memo means no buy.
   "AI desk" (valid buys) vs "rules only" (all 20) vs SPY, $100k virtual each, on the Paper tab.
+- **Telegram reports** (designed with the user 2026-10-20): `/analise <ticker, name or coin>` answers at once with a
+  price snapshot (Worker), then a GitHub job (report.yml) sends one picture: for companies price vs SPY, key numbers,
+  5 years of revenue/profit/free cash flow (SEC), a peer bubble map (same SEC industry, widening to the industry
+  group/sector if fewer than 5 tracked peers), a scorecard (quality/value/growth/momentum percentiles vs ~1,500
+  companies) and fact-checked AI lines; for coins price, funding, open interest, attention, stablecoins, news.
+  `/news` and the 08:00 / 22:30 briefings: stocks, crypto, oil, gold, 10-year yield, dollar, and "why" lines that must
+  cite and quote real headlines (one AI call per topic with only headlines mentioning it; "no headline explains it" is
+  an allowed answer). Archived on the web app's Reports page (pictures in R2, index in D1). Not financial advice.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog

@@ -30,7 +30,7 @@ from trader.data.sec import sec_path
 from trader.data.store import read
 
 BULK_URL = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
-MAX_AGE = pd.Timedelta(days=540)   # a figure filed longer ago than this is ignored (company stopped filing?)
+MAX_AGE = pd.Timedelta(days=540)   # a concept whose latest figure is older than this is ignored (stopped filing?)
 
 FLOWS = {   # annual figures (10-K), first matching tag wins per company and year
     "revenue": ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet",
@@ -154,11 +154,14 @@ def as_of(fund: pd.DataFrame, date: pd.Timestamp) -> pd.DataFrame:
     Annual flows: the latest fiscal year (and the one before, `_prev`, for growth).
     Balance sheet and shares: the latest reported."""
     date = date.tz_localize(None) if date.tzinfo else date
-    known = fund[(fund["filed"] <= date) & (fund["filed"] > date - MAX_AGE)]   # stale figures don't count
-    out = {}
+    known = fund[fund["filed"] <= date]
+    fresh = date - MAX_AGE           # a concept whose LATEST figure was filed before this is stale (dropped);
+    out = {}                         # older figures still count as history (last year's revenue, for growth)
     flows = known[known["concept"].isin(FLOWS)].sort_values(["cik", "concept", "end"])
     if len(flows):
         last = flows.groupby(["cik", "concept"]).tail(2)
+        latest_filed = last.groupby(["cik", "concept"])["filed"].transform("max")
+        last = last[latest_filed > fresh]
         cur = last.groupby(["cik", "concept"]).tail(1).pivot(index="cik", columns="concept", values="val")
         prev = last.groupby(["cik", "concept"]).head(1).pivot(index="cik", columns="concept", values="val")
         prev_end = last.groupby(["cik", "concept"]).head(1).pivot(index="cik", columns="concept", values="end")
@@ -169,6 +172,7 @@ def as_of(fund: pd.DataFrame, date: pd.Timestamp) -> pd.DataFrame:
         if "revenue" in cur_end:
             out["fiscal_year_end"] = cur_end["revenue"]
     inst = known[~known["concept"].isin(FLOWS)].sort_values(["cik", "concept", "end", "filed"])
+    inst = inst[inst["filed"] > fresh]
     if len(inst):
         latest = inst.groupby(["cik", "concept"]).tail(1).pivot(index="cik", columns="concept", values="val")
         out.update({c: latest[c] for c in latest})

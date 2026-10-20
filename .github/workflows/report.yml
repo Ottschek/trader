@@ -1,0 +1,48 @@
+name: Telegram report
+
+# Started by the Cloudflare Worker when you send /analise <company or coin> or /news to the bot, and
+# for the 08:00 / 22:30 (Vienna) briefings. Builds one picture and sends it to your Telegram chat.
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "analise or news"
+        required: true
+      query:
+        description: "company, ticker or coin (for analise)"
+        default: ""
+      when:
+        description: "Morning / Evening (briefings) or Latest (/news)"
+        default: "Latest"
+
+concurrency:
+  group: reports
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONUNBUFFERED: "1"
+      ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+      ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
+      QUERY: ${{ github.event.inputs.query }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - run: python scripts/report.py --kind "${{ github.event.inputs.kind }}" --query "$QUERY" --when "${{ github.event.inputs.when }}" --cloud

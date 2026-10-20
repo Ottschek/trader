@@ -32,6 +32,7 @@ export function makeAlpaca(env, http) {
                                             `&start=${start.toISOString()}&end=${end}`);
       return (r?.bars?.[symbol] ?? []).find((b) => Date.parse(b.t) === start.getTime()) ?? null;
     },
+    data: (path) => call(DATA_API, "GET", path),
     latestTrade: async (symbol) => {
       const r = await call(DATA_API, "GET", `/v2/stocks/${encodeURIComponent(symbol)}/trades/latest?feed=iex`);
       return r?.trade?.p ?? null;

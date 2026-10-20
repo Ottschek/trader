@@ -48,3 +48,17 @@ def recent_chats() -> list[dict]:
         if chat:
             chats[chat["id"]] = chat
     return list(chats.values())
+
+
+def send_photo(path, caption: str) -> None:
+    """A picture with a caption (HTML, at most 1024 characters)."""
+    url = f"https://api.telegram.org/bot{secret('TELEGRAM_BOT_TOKEN')}/sendPhoto"
+    try:
+        with open(path, "rb") as f:
+            r = requests.post(url, data={"chat_id": secret("TELEGRAM_CHAT_ID"), "caption": caption[:1024], "parse_mode": "HTML"},
+                              files={"photo": f}, timeout=60)
+    except requests.RequestException as e:  # the URL contains the token: never print it
+        raise TelegramError(f"Telegram request failed: {type(e).__name__}") from None
+    body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    if not body.get("ok"):
+        raise TelegramError(f"Telegram sendPhoto failed: {body.get('description', r.status_code)}")

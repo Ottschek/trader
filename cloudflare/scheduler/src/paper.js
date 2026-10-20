@@ -291,5 +291,5 @@ export async function handleCommand(ctx, text) {
       `Last decision: ${last ? `${last.session_date} ${last.kind}` : "none yet"}`,
     ].join("\n");
   }
-  return "Commands: /status · /stop (close positions and halt) · /resume";
+  return "Commands: /analise <company or coin> · /news · /status · /stop (close positions and halt) · /resume";
 }
