@@ -323,6 +323,9 @@ insider and hype data, more crazy ideas — all through the same funnel.
   triggers its one holdout look; Telegram reports who died and who survived. Two ideas a week, on purpose: every
   idea raises the deflated-Sharpe bar. Ideas live in ledger/brain_ideas.jsonl; the workflow commits ledger/ back,
   so pull before committing locally. First idea (funding_mean_reversion) died: Sharpe 0.29, timing p = 0.88.
+- **Farside ETF flows stopped (2026-10-20):** since 2026-10-19 the site serves Cloudflare's bot challenge to every
+  visitor, so every hourly run failed that download and Telegram reported it. Collection is switched off (no
+  attempt to get around bot protection); history to 2026-10-16 stays. No strategy or experiment used it.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog

@@ -3,7 +3,8 @@
 Stored under data/alt/ (synced to R2 like everything else):
     stablecoins.parquet   daily circulating supply of USDT/USDC (DefiLlama, full history)
     pageviews.parquet     daily English Wikipedia pageviews per symbol (attention gauge, since 2015)
-    etf_flows.parquet     daily US spot Bitcoin ETF net flows per fund, US$ millions (Farside, since Jan 2024)
+    etf_flows.parquet     daily US spot Bitcoin ETF net flows per fund, US$ millions (Farside, Jan 2024 to
+                          2026-10-16; no longer updated: the site now blocks automated visitors)
     polymarket.parquet    hourly snapshot of the most-traded Polymarket markets (forward only)
     listings.parquet      new trading pairs detected on Coinbase / Kraken (forward only)
     state.json            when each daily source was last fetched, and the last seen pair lists
@@ -226,8 +227,9 @@ def collect_all(settings, now: pd.Timestamp, run) -> None:
         mark(state, "stablecoins", now)
     if due(state, "pageviews", now) and run("alt pageviews", update_pageviews, cfg.get("wikipedia", {}), now) is not None:
         mark(state, "pageviews", now)
-    if due(state, "etf_flows", now) and run("alt etf flows", update_etf_flows) is not None:
-        mark(state, "etf_flows", now)
+    # ETF flows (Farside) stopped 2026-10-19: the site now sits behind Cloudflare's bot challenge for
+    # every visitor. History up to 2026-10-16 stays in etf_flows.parquet; update_etf_flows is kept for
+    # a manual run if the site opens up again.
     run("alt polymarket", update_polymarket, now, cfg.get("polymarket_top_n", 100))
     run("alt listings", update_listings, state, now)
     news_cfg = getattr(settings, "news", None) or {}
@@ -237,7 +239,7 @@ def collect_all(settings, now: pd.Timestamp, run) -> None:
     save_state(state)
 
 
-ALT_STALENESS_HOURS = {"stablecoins": 72, "pageviews": 96, "etf_flows": 120, "polymarket": 3, "news_headlines": 6}
+ALT_STALENESS_HOURS = {"stablecoins": 72, "pageviews": 96, "polymarket": 3, "news_headlines": 6}
 
 
 def staleness_targets() -> dict[str, tuple[Path, float]]:

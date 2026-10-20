@@ -3,7 +3,7 @@
 const HOUR = 3600 * 1000;
 
 // How old the newest bar may be before a dataset counts as stale (mirrors scripts/collect.py).
-const ALT_MAX_AGE = { stablecoins: 72, pageviews: 96, etf_flows: 120, polymarket: 3, listings: null };
+const ALT_MAX_AGE = { stablecoins: 72, pageviews: 96, etf_flows: null, polymarket: 3, listings: null };   // etf_flows: frozen (Farside blocks bots since 2026-10-19)
 
 export function maxAgeHours(row) {
   if (row.kind === "corporate_actions") return null;

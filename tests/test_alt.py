@@ -83,13 +83,13 @@ def test_collect_all_skips_daily_sources_when_fresh_and_retries_failures(monkeyp
 
     def fake_run(name, fn, *args):
         calls.append(name)
-        return None if name == "alt etf flows" else 1    # ETF flows fail this time
+        return None if name == "alt pageviews" else 1    # pageviews fail this time
 
     class S:
         alt_data = {"stablecoins": {}, "wikipedia": {}, "polymarket_top_n": 5}
 
     alt.collect_all(S(), NOW, fake_run)
-    assert calls == ["alt stablecoins", "alt pageviews", "alt etf flows", "alt polymarket", "alt listings"]
+    assert calls == ["alt stablecoins", "alt pageviews", "alt polymarket", "alt listings"]   # no more ETF flows
     calls.clear()
     alt.collect_all(S(), NOW + pd.Timedelta(hours=1), fake_run)
-    assert calls == ["alt etf flows", "alt polymarket", "alt listings"]   # failed daily source retried, fresh ones skipped
+    assert calls == ["alt pageviews", "alt polymarket", "alt listings"]   # failed daily source retried, fresh ones skipped
