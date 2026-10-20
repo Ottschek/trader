@@ -87,3 +87,41 @@ def test_quality_value_buys_only_profitable_liquid_companies_after_their_filing(
     held = w.index[w["GOOD"] > 0][0].tz_convert("America/New_York").date()
     assert str(held) == "2023-02-28"                                     # first month-end after the Feb 15 filing
     assert check_no_lookahead(make(), data, 3) == []
+
+
+# --- layer 2: memo checks ------------------------------------------------------------------
+
+from trader.paper import research_desk as rd   # noqa: E402
+
+SHEET = {"symbol": "GOOD", "revenue": "$50.00B", "revenue_growth": "+12.3%", "net_income": "$5.00B",
+         "liabilities_to_assets": "+33.3%", "earnings_yield": "+9.1%", "insider_buying_last_90_days": "no"}
+
+
+def test_a_memo_with_checked_reasons_passes():
+    memo = {"decision": "buy", "thesis": "Revenue grew +12.3% to $50.00B and earnings yield is 9.1%.",
+            "risks": "Debt is +33.3% of assets.", "sell_if": "revenue growth turns negative",
+            "citations": [{"fact": "revenue_growth", "value": "+12.3%"}, {"fact": "earnings_yield", "value": "+9.1%"}]}
+    assert rd.check_memo(memo, SHEET) == (True, [])
+
+
+def test_made_up_numbers_or_citations_reject_the_memo():
+    base = {"decision": "buy", "thesis": "Solid.", "risks": "None.",
+            "citations": [{"fact": "revenue_growth", "value": "+12.3%"}, {"fact": "earnings_yield", "value": "+9.1%"}]}
+    ok, problems = rd.check_memo({**base, "thesis": "Margins of 45% are excellent."}, SHEET)
+    assert not ok and "45%" in problems[0]
+    ok, problems = rd.check_memo({**base, "citations": [{"fact": "revenue_growth", "value": "+20%"},
+                                                         {"fact": "earnings_yield", "value": "+9.1%"}]}, SHEET)
+    assert not ok and any("sheet says" in p for p in problems)
+    ok, problems = rd.check_memo({**base, "citations": [{"fact": "moat", "value": "wide"}]}, SHEET)
+    assert not ok and any("unknown fact" in p for p in problems)
+    assert rd.check_memo({**base, "decision": "maybe"}, SHEET)[0] is False
+    assert rd.check_memo({**base, "thesis": "Founded in 1998, profitable since 2004."}, SHEET)[0] is True   # years are fine
+
+
+def test_books_become_equal_weight_portfolios():
+    idx = pd.DatetimeIndex([pd.Timestamp(f"2026-10-{d} 00:00", tz="America/New_York") for d in (29, 30)]
+                           + [pd.Timestamp(f"2026-11-0{d} 00:00", tz="America/New_York") for d in (2, 3)]).tz_convert("UTC")
+    close = pd.DataFrame(1.0, index=idx, columns=["A", "B", "C", "SPY"])
+    data = type("D", (), {"close": close, "index": idx})()
+    w = rd.targets_from_books([{"decided": "2026-10-30", "ai": ["A"], "rules": ["A", "B"]}], data, "rules")
+    assert w.iloc[0].sum() == 0 and w.iloc[1][["A", "B"]].tolist() == [0.5, 0.5] and w.iloc[3]["A"] == 0.5

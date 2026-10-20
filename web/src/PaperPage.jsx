@@ -279,6 +279,57 @@ function ReversalShadow({ rev }) {
   );
 }
 
+const MEMO_STATUS = { buy: ["ok", "Buy"], veto: ["warn", "Veto"], rejected: ["fail", "Rejected"], error: ["none", "No memo"] };
+
+function ResearchDesk({ research }) {
+  const books = research?.books ?? [], eq = research?.equity ?? [];
+  const last = eq.at(-1);
+  const book = books[0];
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>AI research desk: buys only with checked reasons</h2>
+        <span className="muted">simulation · $100k virtual each · no orders · rules frozen 20 Oct 2026</span>
+      </div>
+      <div className="mini-stats">
+        <div><span className="muted small">AI desk</span><strong>{pct(last ? last.ai - 1 : null, 2)}</strong><span className="muted small">valid buy memos only</span></div>
+        <div><span className="muted small">Rules only</span><strong>{pct(last ? last.rules - 1 : null, 2)}</strong><span className="muted small">all 20 picks</span></div>
+        <div><span className="muted small">SPY</span><strong>{pct(last ? last.spy - 1 : null, 2)}</strong></div>
+        <div><span className="muted small">Latest month</span><strong>{book ? `${book.ai.length} / ${book.rules.length}` : "—"}</strong>
+          <span className="muted small">{book ? `bought on ${book.decided}` : "first picks on 30 Oct"}</span></div>
+      </div>
+      {book && (
+        <div className="table-wrap">
+          <table className="table">
+            <thead><tr><th>Company</th><th>Decision</th><th>Memo</th></tr></thead>
+            <tbody>
+              {book.memos.map((m) => {
+                const [status, label] = MEMO_STATUS[m.status] ?? ["none", m.status];
+                return (
+                  <tr key={m.symbol}>
+                    <td>{m.symbol}<span className="muted small"> · {m.sheet?.market_cap}</span></td>
+                    <td><StatusBadge status={status}>{label}</StatusBadge></td>
+                    <td className="small">
+                      {m.memo?.thesis && <div>{m.memo.thesis}</div>}
+                      {m.memo?.risks && <div className="muted">Risks: {m.memo.risks}</div>}
+                      {m.memo?.sell_if && <div className="muted">Sell if: {m.memo.sell_if}</div>}
+                      {m.problems?.length > 0 && <div className="muted">Rejected: {m.problems.slice(0, 2).join("; ")}</div>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="muted small">Each month-end, the quality + value rules pick 20 companies from SEC filings. The free AI
+        (Llama) writes a memo for each, using only a fact sheet from the filings. Code checks every cited fact and every
+        number; a memo with an unbacked claim is rejected and the company isn't bought. Comparing the two portfolios shows
+        whether the AI's judgment adds anything.</p>
+    </section>
+  );
+}
+
 function Plan({ plan }) {
   if (!plan) return null;
   return (
@@ -391,6 +442,7 @@ function Paper({ data }) {
       <LiveVsBacktest r={data.reconcile} />
       <CarrySim rows={data.carry} />
       <ReversalShadow rev={data.reversal} />
+      <ResearchDesk research={data.research} />
       <NewsSignals news={data.news} />
       <Plan plan={data.plan} />
       <Decisions decisions={data.decisions} />

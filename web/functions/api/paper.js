@@ -4,7 +4,7 @@ const parse = (v) => (v == null ? null : JSON.parse(v));
 
 export async function onRequestGet({ env }) {
   const since = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
-  const [plan, decisions, orders, equity, state, recon, carry, newsRuns, newsSignals, revEq, revWeeks] = await env.DB.batch([
+  const [plan, decisions, orders, equity, state, recon, carry, newsRuns, newsSignals, revEq, revWeeks, resBooks, resEq] = await env.DB.batch([
     env.DB.prepare("SELECT * FROM paper_plans ORDER BY as_of DESC LIMIT 1"),
     env.DB.prepare("SELECT * FROM paper_decisions ORDER BY decided_at DESC LIMIT 100"),
     env.DB.prepare("SELECT * FROM paper_orders ORDER BY submitted_at DESC LIMIT 200"),
@@ -16,6 +16,8 @@ export async function onRequestGet({ env }) {
     env.DB.prepare("SELECT * FROM news_signals ORDER BY decided_at DESC LIMIT 1000"),
     env.DB.prepare("SELECT ts, equity FROM reversal_equity ORDER BY ts"),
     env.DB.prepare("SELECT * FROM reversal_weeks ORDER BY decided DESC LIMIT 60"),
+    env.DB.prepare("SELECT book FROM research_books ORDER BY decided DESC LIMIT 3"),
+    env.DB.prepare("SELECT ts, ai, rules, spy FROM research_equity ORDER BY ts"),
   ]);
   const p = plan.results[0];
   return Response.json({
@@ -29,6 +31,7 @@ export async function onRequestGet({ env }) {
     reconcile: recon.results[0] ? parse(recon.results[0].summary) : null,
     carry: carry.results.map((c) => ({ ...c, basis: parse(c.basis), funding: parse(c.funding) })),
     news: { runs: newsRuns.results, signals: newsSignals.results.map((s) => ({ ...s, headlines: parse(s.headlines) })) },
+    research: { books: resBooks.results.map((b) => parse(b.book)), equity: resEq.results },
     reversal: { equity: revEq.results,
                 weeks: revWeeks.results.map((w) => ({ ...w, longs: parse(w.longs), shorts: parse(w.shorts) })) },
   }, { headers: { "Cache-Control": "no-store" } });

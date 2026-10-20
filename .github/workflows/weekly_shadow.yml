@@ -1,4 +1,4 @@
-name: Weekly reversal shadow
+name: Weekend shadows (reversal + research desk)
 
 # Forward simulation of weekly_reversal (fake money, no orders): every weekend, a fresh daily
 # window for the whole universe, then the frozen strategy on it. Sunday is a backup in case
@@ -19,7 +19,7 @@ permissions:
 jobs:
   shadow:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       PYTHONUNBUFFERED: "1"
       ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
@@ -28,6 +28,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,3 +38,5 @@ jobs:
           cache: pip
       - run: pip install -e .
       - run: python scripts/reversal_shadow.py --cloud
+      - name: AI research desk (month-end books, AI memos, portfolios)
+        run: python scripts/research_desk.py --cloud
