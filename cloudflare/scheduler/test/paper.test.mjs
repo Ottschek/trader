@@ -262,3 +262,56 @@ test("webhook ignores wrong secrets and other chats", async () => {
   const stranger = await post("/telegram/s3cret", "s3cret", 999);   // a stranger's /stop: ignored silently
   assert.equal(stranger.status, 200);
 });
+
+// --- BTC price robustness (2026-10-19: Coinbase hadn't published the 12:00 candle at 13:00:19) ---------
+
+function lateCoinbase({ missingCalls = 0, never = false, btcRef = 60_000, btcNow = 61_000 } = {}) {
+  let nowCalls = 0;
+  const messages = [];
+  const http = async (url, opts = {}) => {
+    if (url.startsWith("https://api.telegram.org/")) { messages.push(JSON.parse(opts.body).text); return new Response("{}"); }
+    const start = Date.parse(new URL(url).searchParams.get("start"));
+    if (start === FRI_CLOSE - 3600_000) return new Response(JSON.stringify([[start / 1000, 0, 0, 0, btcRef, 1]]));
+    nowCalls += 1;
+    if (never || nowCalls <= missingCalls) return new Response("[]");          // the candle isn't published yet
+    return new Response(JSON.stringify([[start / 1000, 0, 0, 0, btcNow, 1]]));
+  };
+  return { http, messages, calls: () => nowCalls };
+}
+
+const NO_WAIT = { waitMs: 0, sleep: async () => {} };
+
+test("a candle Coinbase publishes late is waited for", async () => {
+  const cb = lateCoinbase({ missingCalls: 2 });
+  const c = { ...ctx({}), http: cb.http, btcOptions: NO_WAIT };
+  const r = await morning(c);
+  assert.equal(r.entry, "no_trade");
+  assert.equal(cb.calls(), 3);
+  const d = await c.store.lastDecision();
+  assert.equal(d.kind, "no_trade");
+  assert.equal(d.detail.btc_source, "coinbase/coinbase");
+});
+
+test("if Coinbase never has it, Alpaca's BTC bar is used", async () => {
+  const cb = lateCoinbase({ never: true });
+  const alpaca = fakeAlpaca();
+  alpaca.cryptoBar = async () => ({ c: 60_000 * 1.08 });
+  const c = { ...ctx({ alpaca }), http: cb.http, btcOptions: NO_WAIT };
+  const r = await morning(c);
+  assert.equal(r.entry, "entry");
+  assert.equal((await c.store.lastDecision()).detail.btc_source, "coinbase/alpaca");
+});
+
+test("if no price can be found, the day is recorded as skipped with the reason (never silent)", async () => {
+  const cb = lateCoinbase({ never: true });
+  const alpaca = fakeAlpaca();
+  alpaca.cryptoBar = async () => null;
+  const c = { ...ctx({ alpaca }), http: cb.http, btcOptions: NO_WAIT };
+  const r = await morning(c);
+  assert.match(r.error, /no BTC candle/);
+  const d = await c.store.lastDecision();
+  assert.equal(d.kind, "skipped");
+  assert.match(d.detail.reason, /Alpaca had none either/);
+  assert.ok(cb.messages.some((m) => m.includes("Weekend decision failed")));
+  assert.equal((await morning(c)).skipped, "already decided today");
+});

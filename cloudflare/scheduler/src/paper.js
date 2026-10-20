@@ -90,7 +90,19 @@ export async function morning(ctx) {
   const calendar = await alpaca.calendar(addDays(today, -10), today);
   if (!calendar.some((d) => d.date === today)) return { skipped: "market closed today" };
   await store.setState("last_morning", today, isoUtc(now));
+  try {
+    return await decide(ctx, today, calendar);
+  } catch (err) {
+    // never fail silently: the 09:00 run is the only chance today, so record why it didn't decide
+    await store.addDecision({ id: `${today}-entry`, decided_at: isoUtc(now), session_date: today, kind: "skipped",
+                              detail: { label: c.label, reason: `error: ${err.message}` }, experiment: c.experiment });
+    await notify(ctx, `⚠️ Weekend decision failed and was skipped today: ${escapeHtml(err.message)}`).catch(() => {});
+    return { error: err.message };
+  }
+}
 
+async function decide(ctx, today, calendar) {
+  const { c, store, alpaca, now } = ctx;
   const done = [];
   const open = await store.getState("open_trade");
   if (open && open.session_date < today) {
@@ -115,10 +127,11 @@ export async function morning(ctx) {
     return { done, entry: "halted" };
   }
 
-  const btcRef = await btcCloseEndingAt(ctx.http, refEnd);
-  const btcNow = await btcCloseEndingAt(ctx.http, nowEnd);
-  const move = btcNow / btcRef - 1;
-  const detail = { ...base, btc_ref: btcRef, btc_now: btcNow, move: Number(move.toFixed(6)) };
+  const ref = await btcCloseEndingAt(ctx.http, refEnd, { alpaca, ...(ctx.btcOptions ?? {}) });
+  const cur = await btcCloseEndingAt(ctx.http, nowEnd, { alpaca, ...(ctx.btcOptions ?? {}) });
+  const move = cur.close / ref.close - 1;
+  const detail = { ...base, btc_ref: ref.close, btc_now: cur.close, btc_source: [ref.source, cur.source].join("/"),
+                   move: Number(move.toFixed(6)) };
 
   if (move <= c.threshold) {
     await store.addDecision({ id, decided_at: isoUtc(now), session_date: today, kind: "no_trade", detail, experiment: c.experiment });

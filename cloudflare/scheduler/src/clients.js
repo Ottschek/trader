@@ -26,6 +26,12 @@ export function makeAlpaca(env, http) {
     submitOrder: (order) => call(PAPER_API, "POST", "/v2/orders", order),
     getOrder: (id) => call(PAPER_API, "GET", `/v2/orders/${id}`),
     closePosition: (symbol) => call(PAPER_API, "DELETE", `/v2/positions/${encodeURIComponent(symbol)}`),
+    cryptoBar: async (symbol, start) => {
+      const end = new Date(start.getTime() + 3600 * 1000).toISOString();
+      const r = await call(DATA_API, "GET", `/v1beta3/crypto/us/bars?symbols=${encodeURIComponent(symbol)}&timeframe=1Hour` +
+                                            `&start=${start.toISOString()}&end=${end}`);
+      return (r?.bars?.[symbol] ?? []).find((b) => Date.parse(b.t) === start.getTime()) ?? null;
+    },
     latestTrade: async (symbol) => {
       const r = await call(DATA_API, "GET", `/v2/stocks/${encodeURIComponent(symbol)}/trades/latest?feed=iex`);
       return r?.trade?.p ?? null;
@@ -34,15 +40,37 @@ export function makeAlpaca(env, http) {
 }
 
 /** Close of the Coinbase BTC-USD hourly candle that ENDS at `end` (a Date on the hour). */
-export async function btcCloseEndingAt(http, end) {
+/**
+ * Close of the hourly BTC/USD candle that ends at `end`. Coinbase (what the backtest used) can take a
+ * little while to publish a candle that closed seconds ago, so it is asked again every `waitMs` up to
+ * `tries` times; if it still has none, Alpaca's BTC/USD bar is used (cross-checked: ~3 bps apart).
+ * Returns { close, source }.
+ */
+export async function btcCloseEndingAt(http, end, { alpaca = null, tries = 7, waitMs = 20_000,
+                                                    sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   const start = new Date(end.getTime() - 3600 * 1000);
   const url = `${COINBASE}/products/BTC-USD/candles?granularity=3600&start=${start.toISOString()}&end=${end.toISOString()}`;
-  const res = await http(url, { headers: { "User-Agent": "trader-scheduler" } });
-  if (!res.ok) throw new Error(`Coinbase answered ${res.status}`);
-  const rows = await res.json();   // [[time(s), low, high, open, close, volume], ...]
-  const candle = rows.find((r) => r[0] * 1000 === start.getTime());
-  if (!candle) throw new Error(`no Coinbase BTC candle for ${start.toISOString()}`);
-  return candle[4];
+  let problem = "no candle yet";
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await http(url, { headers: { "User-Agent": "trader-scheduler" } });
+      if (res.ok) {
+        const rows = await res.json();   // [[time(s), low, high, open, close, volume], ...]
+        const candle = rows.find((r) => r[0] * 1000 === start.getTime());
+        if (candle) return { close: candle[4], source: "coinbase" };
+      } else {
+        problem = `Coinbase answered ${res.status}`;
+      }
+    } catch (err) {
+      problem = `Coinbase request failed: ${err.message}`;
+    }
+    if (i < tries - 1) await sleep(waitMs);
+  }
+  if (alpaca) {
+    const bar = await alpaca.cryptoBar("BTC/USD", start).catch(() => null);
+    if (bar) return { close: bar.c, source: "alpaca" };
+  }
+  throw new Error(`no BTC candle for ${start.toISOString()} (${problem}${alpaca ? "; Alpaca had none either" : ""})`);
 }
 
 export async function telegram(env, http, text) {

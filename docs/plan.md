@@ -326,6 +326,11 @@ insider and hype data, more crazy ideas — all through the same funnel.
 - **Farside ETF flows stopped (2026-10-20):** since 2026-10-19 the site serves Cloudflare's bot challenge to every
   visitor, so every hourly run failed that download and Telegram reported it. Collection is switched off (no
   attempt to get around bot protection); history to 2026-10-16 stays. No strategy or experiment used it.
+- **Paper decision bug (2026-10-19):** the first Monday decision crashed: at 13:00:19 UTC Coinbase hadn't yet
+  published the 12:00-13:00 BTC candle, and the day was already marked as decided, so it never retried and left
+  no record. Fixed: the BTC lookup retries for ~2 minutes, then falls back to Alpaca's BTC bar; any error is now
+  recorded as a "skipped" decision with the reason (never silent). Monday was filled in afterwards as no_trade
+  (BTC +1.26%, threshold +6%), with a note saying so; no order would have been placed either way.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
