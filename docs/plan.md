@@ -331,6 +331,14 @@ insider and hype data, more crazy ideas — all through the same funnel.
   no record. Fixed: the BTC lookup retries for ~2 minutes, then falls back to Alpaca's BTC bar; any error is now
   recorded as a "skipped" decision with the reason (never silent). Monday was filled in afterwards as no_trade
   (BTC +1.26%, threshold +6%), with a note saying so; no order would have been placed either way.
+- **quality_value (layer 1 of "research companies, invest with valid reasons")**: fundamentals from the SEC's bulk
+  XBRL file, point-in-time by first filing date (fixes along the way: companies switch revenue tags; multi-class
+  companies lack a share total, so diluted average shares with a public-float fallback; split correction via
+  unadjusted/adjusted month closes). Monthly top 20/40 by quality + value + insider bonus, profitable and
+  cash-generating only. Rejected: OOS Sharpe 0.65 (SPY 0.76), drawdown −43.0%, timing p = 0.627.
+- **AI research desk (layer 2, forward shadow from 2026-10-20)**: each month-end, layer 1's top 20 get a Llama memo
+  built only from an SEC fact sheet; every citation and every number is checked, an unbacked memo means no buy.
+  "AI desk" (valid buys) vs "rules only" (all 20) vs SPY, $100k virtual each, on the Paper tab.
 - Open: none of the M7 list; everything is either rejected or collecting forward evidence.
 
 ## Idea backlog
